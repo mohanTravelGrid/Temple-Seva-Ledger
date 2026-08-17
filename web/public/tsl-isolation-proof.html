@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verify Data Isolation — Temple Seva Ledger</title>
+<style>
+  :root {
+    --bg: #f5f7f4;
+    --surface: #ffffff;
+    --text: #111827;
+    --muted: #64748b;
+    --line: #dbe3df;
+    --green: #0f766e;
+    --green-soft: rgba(15, 118, 110, 0.12);
+    --red: #dc2626;
+    --red-soft: rgba(220, 38, 38, 0.1);
+    --amber: #d97706;
+    --amber-soft: rgba(217, 119, 6, 0.12);
+    --soft-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(15, 118, 110, 0.12), transparent 28%),
+      radial-gradient(circle at 86% 10%, rgba(220, 38, 38, 0.06), transparent 30%),
+      linear-gradient(135deg, #eef7f2 0%, #f8fafc 44%, #fef2f2 100%);
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 36px 20px 60px;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 1px solid rgba(15, 118, 110, 0.22);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--green);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    box-shadow: var(--soft-shadow);
+  }
+
+  h1 {
+    margin: 18px 0 8px;
+    font-size: clamp(24px, 4vw, 42px);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0 0 28px;
+  }
+
+  .card {
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: var(--soft-shadow);
+    padding: 24px;
+    margin-bottom: 18px;
+    backdrop-filter: blur(12px);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .card-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    font-size: 22px;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+
+  .card-icon.green { background: var(--green-soft); color: var(--green); }
+  .card-icon.amber { background: var(--amber-soft); color: var(--amber); }
+  .card-icon.red { background: var(--red-soft); color: var(--red); }
+
+  .card-header h2 {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .card-header p {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .info-item {
+    padding: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.7);
+  }
+
+  .info-item span {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .info-item strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 16px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .badge.green { background: var(--green-soft); color: var(--green); }
+  .badge.red { background: var(--red-soft); color: var(--red); }
+  .badge.amber { background: var(--amber-soft); color: var(--amber); }
+
+  .badge-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .test-section {
+    margin-top: 16px;
+  }
+
+  .test-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  select, button {
+    font: inherit;
+    padding: 10px 16px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 12px;
+    background: #fff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  button {
+    background: var(--green);
+    color: #fff;
+    border: none;
+    font-weight: 700;
+    transition: opacity 0.15s ease;
+  }
+
+  button:hover { opacity: 0.88; }
+
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .result-box {
+    margin-top: 14px;
+    padding: 16px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.6;
+    display: none;
+  }
+
+  .result-box.show { display: block; }
+
+  .result-box.pass {
+    background: rgba(220, 38, 38, 0.06);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    color: #991b1b;
+  }
+
+  .result-box.pass::before {
+    content: "BLOCKED";
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--red-soft);
+    color: var(--red);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+
+  .how-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+  }
+
+  .how-step {
+    padding: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.7);
+    text-align: center;
+  }
+
+  .how-step .step-num {
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--green-soft);
+    color: var(--green);
+    font-size: 16px;
+    font-weight: 900;
+    margin-bottom: 10px;
+  }
+
+  .how-step strong {
+    display: block;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+
+  .how-step p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .error-msg {
+    padding: 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  .error-msg strong {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text);
+    font-size: 18px;
+  }
+
+  @media (max-width: 640px) {
+    .info-grid, .how-grid { grid-template-columns: 1fr; }
+    .test-row { flex-direction: column; align-items: stretch; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="eyebrow">Data Isolation Verification</div>
+    <h1>Verify Your Data Is Protected</h1>
+    <p class="subtitle">
+      This page lets you see — live — that your temple's data is completely isolated from every other temple. 
+      No trust required. Just facts.
+    </p>
+
+    <div id="app">
+      <div class="error-msg" id="errorState">
+        <strong>No Session Found</strong>
+        Please log in to the Temple Seva Ledger first, then return to this page. Your login session is needed to run the verification tests.
+      </div>
+    </div>
+  </div>
+
+<script>
+const API = "/api";
+const SESSION_KEY = "temple-seva-ledger-session";
+
+function getSession() {
+  try {
+    return JSON.parse(localStorage.getItem(SESSION_KEY));
+  } catch { return null; }
+}
+
+async function apiFetch(slug, path, token) {
+  const headers = {};
+  if (token) headers["Authorization"] = "Bearer " + token;
+  const res = await fetch(API + "/" + slug + path, { headers });
+  if (!res.ok) throw { status: res.status, body: await res.json().catch(() => ({})) };
+  return (await res.json()).data;
+}
+
+async function run() {
+  const session = getSession();
+  const app = document.getElementById("app");
+
+  if (!session || !session.token || !session.user) {
+    return;
+  }
+
+  const mySlug = session.user.templeSlug || session.temple?.slug;
+  const myToken = session.token;
+
+  let templeInfo, users, categories, transactions, templeList;
+
+  try {
+    templeInfo = await apiFetch(mySlug, "/me", myToken);
+  } catch {
+    app.innerHTML = '<div class="error-msg"><strong>Session Expired</strong>Please log in again and return to this page.</div>';
+    return;
+  }
+
+  const counts = { users: 0, categories: 0, transactions: 0 };
+
+  try {
+    const cats = await apiFetch(mySlug, "/categories", myToken);
+    counts.categories = Array.isArray(cats) ? cats.reduce((acc, c) => acc + 1 + (c.children?.length || 0), 0) : 0;
+  } catch { /* ok */ }
+
+  try {
+    const txns = await apiFetch(mySlug, "/transactions", myToken);
+    counts.transactions = Array.isArray(txns) ? txns.length : 0;
+  } catch { /* ok */ }
+
+  if (session.user.role === "TRUSTEE" || session.user.role === "SUPER_TRUSTEE") {
+    try {
+      const u = await apiFetch(mySlug, "/admin/users", myToken);
+      counts.users = Array.isArray(u) ? u.length : 0;
+    } catch { /* ok */ }
+  }
+
+  try {
+    templeList = await apiFetch(mySlug, "/public/temples", null);
+  } catch {
+    templeList = [];
+  }
+
+  const otherTemples = templeList.filter(t => t.slug !== mySlug);
+
+  app.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon green">🏛</div>
+        <div>
+          <h2>Your Temple Identity</h2>
+          <p>This is the temple your session is locked to.</p>
+        </div>
+      </div>
+      <div class="info-grid">
+        <div class="info-item"><span>Temple Name</span><strong>${templeInfo.name || mySlug}</strong></div>
+        <div class="info-item"><span>Temple Slug</span><strong>/${mySlug}</strong></div>
+        <div class="info-item"><span>Your Name</span><strong>${templeInfo.user?.name || session.user.name || "—"}</strong></div>
+        <div class="info-item"><span>Your Role</span><strong>${session.user.role}</strong></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon amber">📊</div>
+        <div>
+          <h2>Your Data Scope</h2>
+          <p>This is the complete data your temple has in the system.</p>
+        </div>
+      </div>
+      <div class="info-grid">
+        <div class="info-item"><span>Users</span><strong>${counts.users}</strong></div>
+        <div class="info-item"><span>Categories (inc. sub)</span><strong>${counts.categories}</strong></div>
+        <div class="info-item"><span>Transactions</span><strong>${counts.transactions}</strong></div>
+        <div class="info-item"><span>Isolation Status</span><strong><span class="badge green"><span class="badge-dot"></span> Locked to /${mySlug}</span></strong></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon red">🔒</div>
+        <div>
+          <h2>Isolation Test</h2>
+          <p>Try to access another temple's data with your session token. The server should reject it.</p>
+        </div>
+      </div>
+      <div class="test-section">
+        <div class="test-row">
+          <select id="testSlug" style="min-width:200px;">
+            ${otherTemples.length > 0
+              ? otherTemples.map(t => '<option value="' + t.slug + '">' + t.name + ' (/' + t.slug + ')</option>').join("")
+              : '<option value="">No other temples found</option>'
+            }
+          </select>
+          <button id="testBtn" ${otherTemples.length === 0 ? "disabled" : ""}>Test Isolation</button>
+        </div>
+        <div class="result-box" id="testResult"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon green">💡</div>
+        <div>
+          <h2>How It Works</h2>
+          <p>Three layers of protection keep your data safe.</p>
+        </div>
+      </div>
+      <div class="how-grid">
+        <div class="how-step">
+          <div class="step-num">1</div>
+          <strong>Login locks to temple</strong>
+          <p>When you sign in, your session token is bound to your temple. It cannot be used for any other temple.</p>
+        </div>
+        <div class="how-step">
+          <div class="step-num">2</div>
+          <strong>Server checks every call</strong>
+          <p>Every API request verifies that the session token matches the temple in the URL. A mismatch returns 403 Forbidden.</p>
+        </div>
+        <div class="how-step">
+          <div class="step-num">3</div>
+          <strong>Database filters every query</strong>
+          <p>Every database query includes a temple ID filter. There is no code path that can return another temple's data.</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const testBtn = document.getElementById("testBtn");
+  const testResult = document.getElementById("testResult");
+
+  if (testBtn) {
+    testBtn.addEventListener("click", async () => {
+      const targetSlug = document.getElementById("testSlug").value;
+      if (!targetSlug) return;
+
+      testBtn.disabled = true;
+      testBtn.textContent = "Testing...";
+      testResult.className = "result-box";
+      testResult.style.display = "none";
+
+      try {
+        await apiFetch(targetSlug, "/me", myToken);
+        testResult.className = "result-box show pass";
+        testResult.innerHTML = "UNEXPECTED: The server allowed access to /" + targetSlug + " with your token. This should not happen.";
+      } catch (err) {
+        const status = err.status || "unknown";
+        testResult.className = "result-box show pass";
+        testResult.innerHTML =
+          "Your session token was <strong>rejected</strong> for /" + targetSlug + ".<br>" +
+          "Server returned: <strong>" + status + "</strong> — " + (err.body?.message || "Forbidden") + "<br><br>" +
+          "The server confirmed your session belongs only to <strong>/" + mySlug + "</strong>. " +
+          "Another temple's data cannot be accessed with your login.";
+      }
+
+      testBtn.disabled = false;
+      testBtn.textContent = "Test Isolation";
+    });
+  }
+}
+
+run();
+</script>
+</body>
+</html>

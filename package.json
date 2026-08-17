@@ -1,0 +1,16 @@
+{
+  "name": "temple-seva-ledger",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace server",
+    "dev:web": "npm run dev --workspace web",
+    "dev:server": "npm run dev --workspace server",
+    "build": "npm run build --workspace web",
+    "start": "npm run start --workspace server"
+  }
+}

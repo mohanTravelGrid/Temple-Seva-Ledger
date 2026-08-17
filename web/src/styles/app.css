@@ -1,0 +1,552 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #172033;
+  background: #eef4ff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(237, 246, 255, 0.92), rgba(255, 244, 230, 0.7)),
+    repeating-linear-gradient(90deg, rgba(42, 93, 130, 0.04) 0 1px, transparent 1px 58px);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.app-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 16px 14px 86px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px 4px 18px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(26px, 7vw, 42px);
+  line-height: 1.05;
+}
+
+h2 {
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.eyebrow {
+  color: #7a4f10;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.subtle,
+small {
+  color: #6d7890;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.login-card,
+.panel,
+.welcome-card {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(135, 153, 180, 0.26);
+  border-radius: 28px;
+  box-shadow: 0 20px 45px rgba(49, 72, 102, 0.12);
+  padding: 20px;
+}
+
+.login-card {
+  width: min(100%, 430px);
+}
+
+.control-story-link {
+  display: block;
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f766e;
+  text-decoration: none;
+  opacity: 0.82;
+  transition: opacity 0.15s ease;
+}
+
+.control-story-link:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.logo-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 18px;
+  color: #9a5a00;
+  background: linear-gradient(135deg, #fff4cc, #ffe2a8);
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.content-stack,
+.form-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.home-card {
+  min-height: 138px;
+  text-align: left;
+  border: 1px solid rgba(135, 153, 180, 0.24);
+  border-radius: 24px;
+  background: #fff;
+  padding: 16px;
+  box-shadow: 0 14px 30px rgba(49, 72, 102, 0.1);
+}
+
+.home-card span,
+.home-card small,
+.home-card strong {
+  display: block;
+}
+
+.home-card span {
+  color: #536079;
+  font-weight: 800;
+}
+
+.home-card strong {
+  margin: 14px 0 8px;
+  font-size: 25px;
+  line-height: 1.05;
+}
+
+.home-card.income {
+  background: linear-gradient(135deg, #ffffff, #eafff5);
+}
+
+.home-card.expense {
+  background: linear-gradient(135deg, #ffffff, #fff2df);
+}
+
+.home-card.report {
+  background: linear-gradient(135deg, #ffffff, #edf4ff);
+}
+
+.home-card.pooja {
+  background: linear-gradient(135deg, #ffffff, #fff6cf);
+}
+
+.home-card.admin {
+  background: linear-gradient(135deg, #ffffff, #f0edff);
+}
+
+.today-pooja-strip {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.35fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  border: 1px solid rgba(201, 149, 32, 0.28);
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(255, 250, 224, 0.96), rgba(255, 255, 255, 0.92));
+  box-shadow: 0 14px 30px rgba(49, 72, 102, 0.1);
+  padding: 16px;
+}
+
+.today-pooja-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.today-pooja-item {
+  flex: 0 0 auto;
+  min-width: 220px;
+  text-align: left;
+  border: 1px solid rgba(201, 149, 32, 0.28);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #172033;
+  padding: 12px 14px;
+}
+
+.today-pooja-item strong,
+.today-pooja-item span {
+  display: block;
+}
+
+.today-pooja-item span {
+  margin-top: 4px;
+  color: #6d7890;
+  font-size: 13px;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  color: #3c485f;
+  font-weight: 750;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid rgba(112, 128, 150, 0.32);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #172033;
+  padding: 13px 14px;
+  outline: none;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.primary-button,
+.ghost-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 850;
+}
+
+.primary-button {
+  color: #fff;
+  background: #1f6f5b;
+  box-shadow: 0 12px 22px rgba(31, 111, 91, 0.2);
+}
+
+.ghost-button {
+  color: #1f6f5b;
+  background: rgba(31, 111, 91, 0.08);
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.section-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.compact-panel {
+  box-shadow: 0 10px 24px rgba(49, 72, 102, 0.1);
+}
+
+.dashboard-filter {
+  width: min(100%, 360px);
+  padding: 14px;
+}
+
+.dashboard-filter label {
+  font-size: 13px;
+}
+
+.dashboard-filter input {
+  padding: 11px 12px;
+  border-radius: 14px;
+}
+
+.ledger-heading {
+  margin-bottom: 0;
+}
+
+.ledger-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.ledger-filters label {
+  font-size: 13px;
+}
+
+.ledger-filters input,
+.ledger-filters select {
+  padding: 11px 12px;
+  border-radius: 14px;
+}
+
+.ledger-row,
+.approval-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(135, 153, 180, 0.24);
+  border-radius: 22px;
+  padding: 15px;
+  box-shadow: 0 12px 24px rgba(49, 72, 102, 0.08);
+}
+
+.approval-card {
+  display: block;
+}
+
+.ledger-row p {
+  color: #536079;
+  margin: 5px 0;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mini-button,
+.text-button {
+  border: 0;
+  color: #1f6f5b;
+  background: rgba(31, 111, 91, 0.1);
+  font-weight: 850;
+}
+
+.mini-button {
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.mini-button.danger {
+  color: #b83434;
+  background: rgba(184, 52, 52, 0.1);
+}
+
+.text-button {
+  border-radius: 14px;
+  padding: 8px 12px;
+}
+
+.locked-note {
+  color: #7b8494;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(23, 32, 51, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+.modal-panel {
+  width: min(100%, 760px);
+  max-height: min(88vh, 760px);
+  overflow: auto;
+  border: 1px solid rgba(135, 153, 180, 0.28);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 26px 70px rgba(23, 32, 51, 0.26);
+  padding: 20px;
+}
+
+.ledger-row.income {
+  border-left: 5px solid #20a36b;
+}
+
+.ledger-row.expense {
+  border-left: 5px solid #ef9b28;
+}
+
+.ledger-row.pooja {
+  border-left: 5px solid #d9a31d;
+}
+
+.notice {
+  color: #1f6f5b;
+  font-weight: 800;
+}
+
+.error {
+  color: #bd3131;
+  font-weight: 800;
+}
+
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  width: min(calc(100% - 24px), 640px);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  padding: 8px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(135, 153, 180, 0.25);
+  box-shadow: 0 16px 34px rgba(49, 72, 102, 0.18);
+}
+
+.bottom-nav button {
+  border: 0;
+  border-radius: 16px;
+  padding: 10px 3px;
+  background: transparent;
+  color: #69758a;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.bottom-nav button.active {
+  color: #1f6f5b;
+  background: rgba(31, 111, 91, 0.1);
+}
+
+.admin-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 6px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(135, 153, 180, 0.24);
+}
+
+.admin-tabs.four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.admin-tabs button {
+  border: 0;
+  border-radius: 14px;
+  padding: 10px;
+  background: transparent;
+  color: #69758a;
+  font-weight: 850;
+}
+
+.admin-tabs button.active {
+  color: #1f6f5b;
+  background: rgba(31, 111, 91, 0.12);
+}
+
+.subcategory-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(31, 111, 91, 0.2);
+}
+
+.subcategory-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(241, 247, 255, 0.7);
+  border: 1px solid rgba(135, 153, 180, 0.18);
+  border-radius: 14px;
+  padding: 8px 12px;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #1f6f5b;
+  background: rgba(31, 111, 91, 0.1);
+}
+
+.badge.inactive {
+  color: #7b8494;
+  background: rgba(123, 132, 148, 0.12);
+}
+
+@media (min-width: 760px) {
+  .home-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .panel,
+  .welcome-card {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 680px) {
+  .ledger-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .today-pooja-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .section-title {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .modal-panel {
+    padding: 16px;
+  }
+}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#1f6f5b"/>
+  <circle cx="256" cy="256" r="166" fill="#fff4cc"/>
+  <circle cx="256" cy="256" r="135" fill="#fff9e7"/>
+  <path d="M256 78 110 176v46l146-94 146 94v-46L256 78Z" fill="#d9a31d"/>
+  <path d="M144 392h224v-40H144v40Zm34-68h156l-78-66-78 66Z" fill="#1f6f5b"/>
+  <text x="256" y="295" text-anchor="middle" font-family="Georgia, serif" font-size="160" font-weight="700" fill="#7a4f10">ॐ</text>
+</svg>

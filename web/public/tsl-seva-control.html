@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TSL Seva Control — Module Linkage and MIS Flow</title>
+<style>
+  :root {
+    --bg: #f5f7f4;
+    --surface: #ffffff;
+    --text: #111827;
+    --muted: #64748b;
+    --line: #dbe3df;
+    --green: #0f766e;
+    --green-soft: rgba(15, 118, 110, 0.12);
+    --amber: #d97706;
+    --amber-soft: rgba(217, 119, 6, 0.12);
+    --blue: #2563eb;
+    --blue-soft: rgba(37, 99, 235, 0.1);
+    --violet: #7c3aed;
+    --violet-soft: rgba(124, 58, 237, 0.1);
+    --shadow: 0 22px 60px rgba(15, 23, 42, 0.1);
+    --soft-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(15, 118, 110, 0.12), transparent 28%),
+      radial-gradient(circle at 86% 10%, rgba(217, 119, 6, 0.12), transparent 30%),
+      linear-gradient(135deg, #eef7f2 0%, #f8fafc 44%, #fff7ed 100%);
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  header {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 42px 22px 18px;
+    text-align: center;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 1px solid rgba(15, 118, 110, 0.22);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--green);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    box-shadow: var(--soft-shadow);
+  }
+
+  h1 {
+    margin: 18px 0 10px;
+    font-size: clamp(22px, 3.5vw, 38px);
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+
+  header p {
+    max-width: 800px;
+    margin: 0 auto;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    max-width: 1120px;
+    margin: 8px auto 18px;
+    padding: 0 18px;
+  }
+
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.74);
+    color: #475569;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  .dot.amber { background: var(--amber); }
+  .dot.blue { background: var(--blue); }
+  .dot.violet { background: var(--violet); }
+
+  main {
+    max-width: 1440px;
+    margin: 0 auto 44px;
+    padding: 0 18px 32px;
+  }
+
+  .canvas {
+    position: relative;
+    overflow: hidden;
+    min-height: 780px;
+    padding: 34px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 30px;
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+  }
+
+  .canvas::before {
+    content: "";
+    position: absolute;
+    inset: 22px;
+    border: 1px dashed rgba(15, 118, 110, 0.16);
+    border-radius: 24px;
+    pointer-events: none;
+  }
+
+  .flow-grid {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr 1.35fr 1.1fr;
+    gap: 26px;
+    align-items: stretch;
+  }
+
+  .column {
+    display: grid;
+    gap: 18px;
+    align-content: start;
+  }
+
+  .group-title {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .node {
+    position: relative;
+    display: grid;
+    gap: 10px;
+    min-height: 118px;
+    padding: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 22px;
+    background: var(--surface);
+    box-shadow: var(--soft-shadow);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .node:hover {
+    transform: translateY(-3px);
+    border-color: rgba(15, 118, 110, 0.35);
+    box-shadow: 0 24px 44px rgba(15, 23, 42, 0.12);
+  }
+
+  .node.green { background: linear-gradient(135deg, #ffffff, #effdfa); }
+  .node.amber { background: linear-gradient(135deg, #ffffff, #fff7ed); }
+  .node.blue { background: linear-gradient(135deg, #ffffff, #eff6ff); }
+  .node.violet { background: linear-gradient(135deg, #ffffff, #f5f3ff); }
+
+  .node-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: var(--green-soft);
+    color: var(--green);
+    font-size: 22px;
+    font-weight: 900;
+  }
+
+  .amber .icon { background: var(--amber-soft); color: var(--amber); }
+  .blue .icon { background: var(--blue-soft); color: var(--blue); }
+  .violet .icon { background: var(--violet-soft); color: var(--violet); }
+
+  .node h2 {
+    margin: 0;
+    font-size: 19px;
+    line-height: 1.16;
+  }
+
+  .node p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .module-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .module-stack .node { min-height: 132px; }
+
+  .process-band {
+    position: relative;
+    z-index: 1;
+    margin-top: 28px;
+    padding: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 24px;
+    background:
+      linear-gradient(90deg, rgba(15, 118, 110, 0.09), rgba(217, 119, 6, 0.09)),
+      rgba(255, 255, 255, 0.72);
+  }
+
+  .phase-track {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .phase {
+    padding: 13px 10px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.82);
+    text-align: center;
+  }
+
+  .phase strong {
+    display: block;
+    font-size: 14px;
+  }
+
+  .phase span {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .flow-notes {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .flow-note {
+    padding: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .flow-note strong {
+    display: block;
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  .flow-note span {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.45;
+  }
+
+  .mis-strip {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 22px;
+  }
+
+  .metric {
+    padding: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.84);
+  }
+
+  .metric span {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .metric strong {
+    display: block;
+    margin-top: 8px;
+    font-size: 22px;
+  }
+
+  .footer-note {
+    max-width: 980px;
+    margin: 20px auto 0;
+    padding: 18px 22px;
+    border: 1px solid rgba(15, 118, 110, 0.18);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.72);
+    color: #334155;
+    text-align: center;
+    box-shadow: var(--soft-shadow);
+  }
+
+  .panel {
+    position: fixed;
+    top: 0;
+    right: -460px;
+    z-index: 50;
+    width: 430px;
+    max-width: 92vw;
+    height: 100vh;
+    overflow-y: auto;
+    border-left: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: -18px 0 50px rgba(15, 23, 42, 0.16);
+    transition: right 0.28s ease;
+  }
+
+  .panel.open { right: 0; }
+
+  .panel-head {
+    position: sticky;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 22px;
+    border-bottom: 1px solid var(--line);
+    background: #fff;
+  }
+
+  .panel h3 {
+    margin: 0;
+    font-size: 22px;
+  }
+
+  .close {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+  .panel-body {
+    padding: 22px;
+  }
+
+  .panel-section {
+    margin-bottom: 22px;
+  }
+
+  .panel-section h4 {
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .panel-section p,
+  .panel-section li {
+    color: #334155;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .panel-section ul {
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tag {
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(15, 23, 42, 0.2);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .security-band {
+    position: relative;
+    z-index: 1;
+    margin-top: 28px;
+    padding: 18px;
+    border: 1px solid rgba(15, 118, 110, 0.18);
+    border-radius: 24px;
+    background:
+      linear-gradient(90deg, rgba(15, 118, 110, 0.09), rgba(37, 99, 235, 0.09)),
+      rgba(255, 255, 255, 0.72);
+  }
+
+  .security-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  .security-card {
+    padding: 18px;
+    border: 1px solid rgba(15, 118, 110, 0.16);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.82);
+  }
+
+  .security-num {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: var(--green-soft);
+    color: var(--green);
+    font-size: 15px;
+    font-weight: 900;
+    margin-bottom: 10px;
+  }
+
+  .security-card strong {
+    display: block;
+    color: var(--text);
+    font-size: 15px;
+    margin-bottom: 6px;
+  }
+
+  .security-card p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 1000px) {
+    .flow-grid,
+    .mis-strip,
+    .flow-notes {
+      grid-template-columns: 1fr;
+    }
+
+    .module-stack,
+    .phase-track,
+    .security-cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    header { padding-top: 28px; }
+    .canvas { padding: 18px; border-radius: 22px; }
+    .module-stack,
+    .phase-track,
+    .security-cards {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media print {
+    @page {
+      size: A4 landscape;
+      margin: 8mm;
+    }
+
+    body {
+      min-height: auto;
+      background: #ffffff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    header {
+      padding: 0 0 6px;
+    }
+
+    .eyebrow {
+      padding: 4px 10px;
+      font-size: 8px;
+      box-shadow: none;
+    }
+
+    h1 {
+      margin: 6px 0 4px;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+    }
+
+    header p {
+      max-width: 760px;
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .legend {
+      gap: 6px;
+      margin: 4px auto 7px;
+      padding: 0;
+    }
+
+    .legend span {
+      padding: 4px 8px;
+      font-size: 8px;
+      box-shadow: none;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+    }
+
+    main {
+      max-width: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .canvas {
+      min-height: auto;
+      padding: 13px;
+      border-radius: 18px;
+      box-shadow: none;
+      page-break-inside: avoid;
+    }
+
+    .canvas::before {
+      display: none;
+    }
+
+    .flow-grid {
+      grid-template-columns: 0.82fr 1.58fr 0.95fr;
+      gap: 10px;
+    }
+
+    .column {
+      gap: 7px;
+    }
+
+    .group-title {
+      font-size: 8px;
+      letter-spacing: 0.12em;
+    }
+
+    .module-stack {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .node,
+    .module-stack .node {
+      min-height: 68px;
+      gap: 5px;
+      padding: 9px;
+      border-radius: 13px;
+      box-shadow: none;
+      cursor: default;
+    }
+
+    .node-head {
+      gap: 7px;
+    }
+
+    .icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      font-size: 13px;
+    }
+
+    .node h2 {
+      font-size: 12px;
+      line-height: 1.08;
+    }
+
+    .node p {
+      font-size: 8.3px;
+      line-height: 1.24;
+    }
+
+    .process-band {
+      margin-top: 9px;
+      padding: 9px;
+      border-radius: 14px;
+    }
+
+    .phase-track {
+      gap: 6px;
+      margin-top: 7px;
+    }
+
+    .phase {
+      padding: 7px 6px;
+      border-radius: 11px;
+    }
+
+    .phase strong {
+      font-size: 10px;
+    }
+
+    .phase span {
+      margin-top: 2px;
+      font-size: 7px;
+    }
+
+    .flow-notes {
+      gap: 7px;
+      margin-top: 8px;
+    }
+
+    .flow-note {
+      padding: 8px;
+      border-radius: 12px;
+    }
+
+    .flow-note strong {
+      font-size: 9px;
+    }
+
+    .flow-note span {
+      margin-top: 2px;
+      font-size: 7.6px;
+      line-height: 1.22;
+    }
+
+    .mis-strip {
+      gap: 7px;
+      margin-top: 8px;
+    }
+
+    .metric {
+      padding: 8px;
+      border-radius: 12px;
+    }
+
+    .metric span {
+      font-size: 7px;
+      letter-spacing: 0.08em;
+    }
+
+    .metric strong {
+      margin-top: 3px;
+      font-size: 11px;
+    }
+
+    .security-band {
+      margin-top: 8px;
+      padding: 9px;
+      border-radius: 14px;
+    }
+
+    .security-cards {
+      gap: 7px;
+      margin-top: 7px;
+    }
+
+    .security-card {
+      padding: 8px;
+      border-radius: 12px;
+    }
+
+    .security-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      font-size: 10px;
+      margin-bottom: 5px;
+    }
+
+    .security-card strong {
+      font-size: 9px;
+      margin-bottom: 3px;
+    }
+
+    .security-card p {
+      font-size: 7.6px;
+      line-height: 1.22;
+    }
+
+    .footer-note {
+      margin: 7px auto 0;
+      padding: 8px 12px;
+      border-radius: 14px;
+      box-shadow: none;
+      font-size: 9px;
+      line-height: 1.32;
+    }
+
+    .panel,
+    .overlay {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">TSL Seva Control</div>
+    <h1>Temple Seva Ledger — Module Linkage &amp; MIS Flow</h1>
+    <p>
+      A simple temple management view showing how temple setup, income &amp; expenses, approvals,
+      pooja calendar, receipts, and audit trail work together to drive management MIS.
+    </p>
+  </header>
+
+  <nav class="legend" aria-label="Legend">
+    <span><i class="dot"></i> Temple Foundation</span>
+    <span><i class="dot amber"></i> Seva Operations</span>
+    <span><i class="dot blue"></i> Evidence &amp; Audit</span>
+    <span><i class="dot violet"></i> Management MIS</span>
+  </nav>
+
+  <main>
+    <section class="canvas" aria-label="Seva Control Flow">
+
+      <div class="flow-grid">
+        <div class="column">
+          <div class="group-title">Temple Foundation</div>
+          <article class="node green" data-node="temple">
+            <div class="node-head"><div class="icon">🏛</div><h2>Temple Master</h2></div>
+            <p>Slug, name, address, logo, approval threshold, default language, and multi-tenant isolation.</p>
+          </article>
+          <article class="node green" data-node="masters">
+            <div class="node-head"><div class="icon">⚙</div><h2>Admin Masters</h2></div>
+            <p>Users &amp; roles (Manager, Trustee, Super Trustee), income/expense categories with subcategories, Kannada &amp; English labels.</p>
+          </article>
+        </div>
+
+        <div class="column">
+          <div class="group-title">Seva Control Workspace</div>
+          <div class="module-stack">
+            <article class="node amber" data-node="income">
+              <div class="node-head"><div class="icon">₹</div><h2>Income Management</h2></div>
+              <p>Hundi, archane, donations, special pooja income — auto-synced from pooja bookings.</p>
+            </article>
+            <article class="node amber" data-node="expense">
+              <div class="node-head"><div class="icon">💸</div><h2>Expense Management</h2></div>
+              <p>Pooja items, salary, maintenance, temple construction, event expenses.</p>
+            </article>
+            <article class="node amber" data-node="approval">
+              <div class="node-head"><div class="icon">✓</div><h2>Approval Workflow</h2></div>
+              <p>Threshold-based expense approval — Manager enters, Trustee or Super Trustee decides.</p>
+            </article>
+            <article class="node amber" data-node="pooja">
+              <div class="node-head"><div class="icon">🪷</div><h2>Pooja Calendar</h2></div>
+              <p>Devotee bookings, occasion tracking, recurring yearly reminders, auto income sync.</p>
+            </article>
+            <article class="node blue" data-node="receipts">
+              <div class="node-head"><div class="icon">📎</div><h2>Receipts &amp; Documents</h2></div>
+              <p>Photo upload linked to transactions — image or PDF, stored securely on server.</p>
+            </article>
+            <article class="node blue" data-node="audit">
+              <div class="node-head"><div class="icon">📋</div><h2>Audit Trail</h2></div>
+              <p>Every create, update, delete, approve, reject — full before/after JSON snapshot.</p>
+            </article>
+          </div>
+        </div>
+
+        <div class="column">
+          <div class="group-title">Management Outcome</div>
+          <article class="node violet" data-node="dashboard">
+            <div class="node-head"><div class="icon">📊</div><h2>Dashboard</h2></div>
+            <p>Today &amp; monthly income, expense, balance, pending approvals, pooja reminders.</p>
+          </article>
+          <article class="node violet" data-node="ledger">
+            <div class="node-head"><div class="icon">📒</div><h2>Ledger &amp; Reports</h2></div>
+            <p>Searchable, filterable transaction list — 2-hour edit window, Trustee unlock, CSV-ready.</p>
+          </article>
+          <article class="node violet" data-node="multitenant">
+            <div class="node-head"><div class="icon">🛕</div><h2>Multi-Tenant Control</h2></div>
+            <p>Provision new temples with seeded categories, auto-created admin, independent data.</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="process-band">
+        <div class="group-title">Temple lifecycle picture</div>
+        <div class="phase-track">
+          <div class="phase"><strong>Temple Setup</strong><span>Slug &amp; Settings</span></div>
+          <div class="phase"><strong>Configure</strong><span>Users &amp; Categories</span></div>
+          <div class="phase"><strong>Daily Seva</strong><span>Income &amp; Expenses</span></div>
+          <div class="phase"><strong>Approvals</strong><span>Trustee Review</span></div>
+          <div class="phase"><strong>Reports</strong><span>Ledger &amp; MIS</span></div>
+          <div class="phase"><strong>Growth</strong><span>Multi-Temple</span></div>
+        </div>
+      </div>
+
+      <div class="flow-notes" aria-label="Module linkage notes">
+        <div class="flow-note"><strong>1. Setup creates scope</strong><span>Temple slug, settings, roles, and categories define who can do what and how data is structured.</span></div>
+        <div class="flow-note"><strong>2. Categories structure the ledger</strong><span>Every income and expense must be categorized — this hierarchy drives all reports and MIS summaries.</span></div>
+        <div class="flow-note"><strong>3. Operations generate data</strong><span>Daily income, expenses, pooja bookings, approvals, and receipts feed the dashboard in real time.</span></div>
+        <div class="flow-note"><strong>4. MIS tells the management story</strong><span>Balance, trends, approval status, and audit trail are calculated from operational entries for informed decisions.</span></div>
+      </div>
+
+      <div class="mis-strip">
+        <div class="metric"><span>Income Tracking</span><strong>Hundi + Archane + Donations</strong></div>
+        <div class="metric"><span>Expense Control</span><strong>Pooja + Salary + Maintenance</strong></div>
+        <div class="metric"><span>Approval Workflow</span><strong>Threshold-Based Trustee Control</strong></div>
+        <div class="metric"><span>Audit &amp; Compliance</span><strong>Every Action Traceable</strong></div>
+      </div>
+
+      <div class="security-band">
+        <div class="group-title">Data Security — How Your Temple Data Is Protected</div>
+        <div class="security-cards">
+          <div class="security-card">
+            <div class="security-num">1</div>
+            <strong>Temple Slug Lock</strong>
+            <p>Every page URL contains your temple's unique slug. The server only shows data that belongs to this slug. No other temple can see it.</p>
+          </div>
+          <div class="security-card">
+            <div class="security-num">2</div>
+            <strong>Session Binding</strong>
+            <p>When you log in, your session is locked to your temple. Even if someone guesses your login token, the server checks that the token belongs to the correct temple.</p>
+          </div>
+          <div class="security-card">
+            <div class="security-num">3</div>
+            <strong>Database Filtering</strong>
+            <p>Every database query includes a temple filter. There is no code path that returns data from a different temple. It is physically impossible for one temple's data to appear in another temple's view.</p>
+          </div>
+          <div class="security-card">
+            <div class="security-num">4</div>
+            <strong>Audit Trail</strong>
+            <p>Every action — who did what, when, what changed — is logged with before/after JSON snapshots. Nothing can be modified silently.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer-note">
+      TSL Seva Control connects the daily temple truth with management MIS, while keeping the workflow simple enough for temple managers moving from paper registers and WhatsApp updates.
+    </div>
+  </main>
+
+  <div class="overlay" id="overlay"></div>
+  <aside class="panel" id="panel" aria-label="Module details">
+    <div class="panel-head">
+      <h3 id="panelTitle">Module</h3>
+      <button class="close" id="closePanel" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div class="panel-body" id="panelBody"></div>
+  </aside>
+
+<script>
+const details = {
+  temple: {
+    title: "Temple Master",
+    purpose: "Creates the temple context — every transaction, pooja booking, user, category, and audit entry is scoped to this temple.",
+    captures: ["Temple slug (URL-safe identifier)", "Temple name and address", "Logo URL", "Approval threshold (default ₹2,000)", "Default language (English / Kannada)", "Active / inactive status"],
+    feeds: ["Multi-tenant data isolation", "URL routing (/slug/dashboard, etc.)", "Approval threshold for expenses", "Default UI language for all users", "Pooja income auto-sync category lookup"]
+  },
+  masters: {
+    title: "Admin Masters",
+    purpose: "Keeps the temple's operational structure configurable — users with role-based access and a category hierarchy for every transaction.",
+    captures: ["Users: name, email, phone, role, password", "Roles: MANAGER, TRUSTEE, SUPER_TRUSTEE", "Categories: income and expense type", "Subcategories: parent-child hierarchy", "Sort order and active/inactive status", "Kannada and English label translations"],
+    feeds: ["Login and session authentication", "Role-based access control on every endpoint", "Transaction form category dropdowns", "Ledger display category names", "Dashboard category-wise MIS", "Pooja income auto-sync category lookup"]
+  },
+  income: {
+    title: "Income Management",
+    purpose: "Records all temple income — daily collections, special events, donations, and auto-synced pooja income in one place.",
+    captures: ["Category and subcategory", "Amount and transaction date", "Payment mode (Cash / UPI / Bank / Cheque)", "Devotee or source name", "Notes and receipt photo", "Auto-approved for income entries"],
+    feeds: ["Dashboard today/month income totals", "Ledger filterable income list", "Monthly balance calculation", "Category-wise income reports", "Pooja booking income auto-sync target"]
+  },
+  expense: {
+    title: "Expense Management",
+    purpose: "Records all temple expenses with automatic approval routing — expenses above the threshold are held for trustee approval.",
+    captures: ["Category and subcategory", "Amount and transaction date", "Payment mode (Cash / UPI / Bank / Cheque)", "Shop or vendor name", "Notes and receipt photo", "Auto-routed to approval if above threshold"],
+    feeds: ["Dashboard today/month expense totals", "Approval queue (if above threshold)", "Ledger filterable expense list", "Monthly balance calculation", "Category-wise expense reports"]
+  },
+  approval: {
+    title: "Approval Workflow",
+    purpose: "Ensures financial control — Manager-entered expenses above the temple threshold require Trustee or Super Trustee approval before affecting totals.",
+    captures: ["Transaction reference", "Requested by (Manager)", "Threshold amount (configurable per temple)", "Decision: Approved or Rejected", "Decision comments", "Decided by and decided at timestamp"],
+    feeds: ["Dashboard pending approvals count", "Transaction status (PENDING_APPROVAL → APPROVED/REJECTED)", "Monthly expense totals (only APPROVED counted)", "Full audit trail of approval decisions", "Manager notification of rejection reason"]
+  },
+  pooja: {
+    title: "Pooja Calendar",
+    purpose: "Manages devotee pooja bookings with automatic income sync — every booking with an amount creates a linked income transaction.",
+    captures: ["Devotee name and mobile number", "Pooja type (Abhisheka, Alankara, Sankalpa, etc.)", "Occasion (Birthday, Wedding Anniversary, Memorial, Other)", "Occasion date and amount", "Recurring yearly flag", "Notes"],
+    feeds: ["Dashboard today/month pooja count", "Seva reminders strip on home screen", "Auto-created income transactions", "Monthly pooja bookings list", "Pooja-wise income tracking"]
+  },
+  receipts: {
+    title: "Receipts & Documents",
+    purpose: "Captures photo evidence for transactions — receipts, bills, and supporting documents linked directly to ledger entries.",
+    captures: ["Receipt photo or PDF", "Linked to transaction ID", "Original filename preserved", "MIME type tracked", "Max 8 MB per file", "Secure file storage on server"],
+    feeds: ["Transaction audit evidence", "Future receipt viewer (planned)", "Server file management", "Trust and transparency for approvals", "Supporting documentation for audits"]
+  },
+  audit: {
+    title: "Audit Trail",
+    purpose: "Provides a complete, tamper-evident log of every change made in the system — who did what, when, and what changed.",
+    captures: ["Entity type (Temple, User, Category, Transaction, Pooja Booking)", "Entity ID and action (Create, Update, Delete, Unlock, Approve, Reject)", "Before JSON snapshot", "After JSON snapshot", "Performed by user", "Comments and timestamp"],
+    feeds: ["Forensic investigation of data changes", "Trust and transparency for temple management", "Dispute resolution for approval decisions", "Regulatory and compliance support", "Future audit log viewer (planned)"]
+  },
+  dashboard: {
+    title: "Dashboard",
+    purpose: "Gives temple managers and trustees a quick, clear picture of where the temple stands — today and for the selected month.",
+    captures: ["Today income and expense", "Month income and expense", "Month balance (income minus expense)", "Pending approvals count", "Today and month pooja counts", "Pooja bookings list for the month"],
+    feeds: ["Quick navigation to Income / Expense / Ledger forms", "Approvals queue access for managers", "Admin panel access for trustees", "Pooja calendar link with month context", "Monthly filter selector for historical views"]
+  },
+  ledger: {
+    title: "Ledger & Reports",
+    purpose: "The central transaction list — searchable, filterable, with a 2-hour correction window and Trustee unlock mechanism.",
+    captures: ["Date range filter (from/to)", "Type filter (All / Income / Expense)", "Category and subcategory details", "Entered-by user name", "Transaction status badge", "Edit / Remove / Unlock actions per row"],
+    feeds: ["Complete financial history", "Monthly and category-wise reports", "CSV export readiness", "Audit trail for every edit/delete", "2-hour window enforcement", "Trustee unlock audit logging"]
+  },
+  multitenant: {
+    title: "Multi-Tenant Control",
+    purpose: "Lets Super Trustees provision entirely new temples — each with its own data, users, categories, and settings, fully isolated.",
+    captures: ["New temple name and slug", "Address and default settings", "Approval threshold", "Default language", "Admin user credentials", "Auto-seeded categories (13 income + 8 expense)"],
+    feeds: ["Independent temple URL (/slug)", "Seeded category hierarchy for new temple", "Admin user ready for first login", "Full data isolation between temples", "Super Trustee can manage all temples"]
+  }
+};
+
+const panel = document.getElementById("panel");
+const overlay = document.getElementById("overlay");
+const panelTitle = document.getElementById("panelTitle");
+const panelBody = document.getElementById("panelBody");
+
+function openPanel(key) {
+  const item = details[key];
+  if (!item) return;
+  panelTitle.textContent = item.title;
+  panelBody.innerHTML = `
+    <div class="panel-section">
+      <h4>Purpose</h4>
+      <p>${item.purpose}</p>
+    </div>
+    <div class="panel-section">
+      <h4>What It Captures</h4>
+      <ul>${item.captures.map(value => `<li>${value}</li>`).join("")}</ul>
+    </div>
+    <div class="panel-section">
+      <h4>Feeds Into</h4>
+      <div class="tag-row">${item.feeds.map(value => `<span class="tag">${value}</span>`).join("")}</div>
+    </div>
+  `;
+  panel.classList.add("open");
+  overlay.classList.add("open");
+}
+
+function closePanel() {
+  panel.classList.remove("open");
+  overlay.classList.remove("open");
+}
+
+document.querySelectorAll("[data-node]").forEach(node => {
+  node.addEventListener("click", () => openPanel(node.dataset.node));
+});
+
+document.getElementById("closePanel").addEventListener("click", closePanel);
+overlay.addEventListener("click", closePanel);
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") closePanel();
+});
+</script>
+</body>
+</html>
