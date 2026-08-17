@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import multer from "multer";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { createSession, requireAuth, requireRole } from "./auth.js";
@@ -836,9 +836,19 @@ app.delete("/api/:templeSlug/pooja-bookings/:id", requireAuth, (req, res) => {
   ok(res, { id: before.id });
 });
 
+const webDist = join(process.cwd(), "web", "dist");
+if (existsSync(webDist)) {
+  app.use(express.static(webDist));
+  app.use((req, res, next) => {
+    if (req.method !== "GET") return next();
+    if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) return next();
+    res.sendFile(join(webDist, "index.html"));
+  });
+}
+
 const server = createServer(app);
 
-server.listen(port, "127.0.0.1", () => {
+server.listen(port, "0.0.0.0", () => {
   console.log(`Temple Seva Ledger API running on http://localhost:${port}`);
   console.log("API listener", server.address());
 });
