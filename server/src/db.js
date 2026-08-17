@@ -2,14 +2,14 @@ import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { DatabaseSync } from "node:sqlite";
+import Database from "better-sqlite3";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || join(__dirname, "..", "data");
 mkdirSync(dataDir, { recursive: true });
 
-export const db = new DatabaseSync(join(dataDir, "temple-seva-ledger.db"));
-db.exec("PRAGMA foreign_keys = ON");
+export const db = new Database(join(dataDir, "temple-seva-ledger.db"));
+db.pragma("foreign_keys = ON");
 
 export function hashPassword(password, salt = randomBytes(16).toString("hex")) {
   const hash = createHash("sha256").update(`${salt}:${password}`).digest("hex");
