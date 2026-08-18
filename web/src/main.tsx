@@ -42,8 +42,16 @@ import {
 import { allLabels, LangCode } from "./i18n";
 import "./styles/app.css";
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(value || 0));
+const CURRENCY_MAP: Record<string, { locale: string; code: string }> = {
+  INR: { locale: "en-IN", code: "INR" },
+  GBP: { locale: "en-GB", code: "GBP" },
+  USD: { locale: "en-US", code: "USD" },
+};
+
+const formatCurrency = (value: number, currency = "INR") => {
+  const cfg = CURRENCY_MAP[currency] || CURRENCY_MAP.INR;
+  return new Intl.NumberFormat(cfg.locale, { style: "currency", currency: cfg.code, maximumFractionDigits: 0 }).format(Number(value || 0));
+};
 
 const isWithinCorrectionWindow = (createdAt?: string) => {
   if (!createdAt) return false;
@@ -74,14 +82,14 @@ const getDefaultLedgerRange = () => {
 
 function App() {
   const [session, setSession] = useState<Session | null>(() => loadSession());
-  const [temple, setTemple] = useState<{ name: string; approvalThreshold: number; defaultLanguage?: string } | null>(null);
+  const [temple, setTemple] = useState<{ name: string; approvalThreshold: number; defaultLanguage?: string; currency?: string } | null>(null);
   const [view, setView] = useState<View>("home");
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     fetchTemplePublic()
       .then(setTemple)
-      .catch(() => setTemple({ name: "Temple Seva Ledger", approvalThreshold: 2000, defaultLanguage: "en" }));
+      .catch(() => setTemple({ name: "Temple Seva Ledger", approvalThreshold: 2000, defaultLanguage: "en", currency: "INR" }));
   }, []);
 
   const onLogin = (next: Session) => {
@@ -114,16 +122,17 @@ function App() {
           </header>
 
           <main>
-            {view === "home" ? <HomeView session={session} onNavigate={setView} refreshKey={refreshKey} /> : null}
+            {view === "home" ? <HomeView session={session} onNavigate={setView} refreshKey={refreshKey} currency={temple?.currency} /> : null}
             {view === "income" ? <TransactionForm type="INCOME" onDone={() => { setRefreshKey((x) => x + 1); setView("ledger"); }} /> : null}
             {view === "expense" ? <TransactionForm type="EXPENSE" onDone={() => { setRefreshKey((x) => x + 1); setView("ledger"); }} /> : null}
-            {view === "ledger" ? <LedgerView session={session} refreshKey={refreshKey} onDone={() => setRefreshKey((x) => x + 1)} /> : null}
-            {view === "approvals" ? <ApprovalsView onDone={() => setRefreshKey((x) => x + 1)} /> : null}
+            {view === "ledger" ? <LedgerView session={session} refreshKey={refreshKey} onDone={() => setRefreshKey((x) => x + 1)} currency={temple?.currency} /> : null}
+            {view === "approvals" ? <ApprovalsView onDone={() => setRefreshKey((x) => x + 1)} currency={temple?.currency} /> : null}
             {view === "pooja" ? <PoojaCalendarView onDone={() => setRefreshKey((x) => x + 1)} /> : null}
             {view === "admin" ? <AdminView session={session} onSettingsChange={(next) => setTemple((current) => ({
               name: next.name ?? current?.name ?? "Temple Seva Ledger",
               approvalThreshold: next.approvalThreshold ?? current?.approvalThreshold ?? 2000,
               defaultLanguage: next.defaultLanguage ?? current?.defaultLanguage ?? "en",
+              currency: next.currency ?? current?.currency ?? "INR",
             }))} /> : null}
           </main>
 
@@ -153,8 +162,8 @@ function BottomNav({ view, onNavigate }: { view: View; onNavigate: (view: View) 
 }
 
 function LoginScreen({ templeName, onLogin }: { templeName: string; onLogin: (session: Session) => void }) {
-  const [email, setEmail] = useState("manager@hanumagiri.org");
-  const [password, setPassword] = useState("Temple123#");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const l = useLabels();
 
@@ -188,7 +197,7 @@ function LoginScreen({ templeName, onLogin }: { templeName: string; onLogin: (se
   );
 }
 
-function HomeView({ session, onNavigate, refreshKey }: { session: Session; onNavigate: (view: View) => void; refreshKey: number }) {
+function HomeView({ session, onNavigate, refreshKey, currency }: { session: Session; onNavigate: (view: View) => void; refreshKey: number; currency?: string }) {
   const [summary, setSummary] = useState({
     todayIncome: 0,
     todayExpense: 0,
@@ -209,9 +218,9 @@ function HomeView({ session, onNavigate, refreshKey }: { session: Session; onNav
   }, [dashboardMonth, refreshKey]);
 
   const cards = [
-    { key: "expense", title: l.expenses, value: formatCurrency(summary.monthExpense), text: l.expensesText, tone: "expense" },
-    { key: "income", title: l.income, value: formatCurrency(summary.monthIncome), text: l.incomeText, tone: "income" },
-    { key: "ledger", title: l.reports, value: formatCurrency(summary.balance), text: l.reportsText, tone: "report" },
+    { key: "expense", title: l.expenses, value: formatCurrency(summary.monthExpense, currency), text: l.expensesText, tone: "expense" },
+    { key: "income", title: l.income, value: formatCurrency(summary.monthIncome, currency), text: l.incomeText, tone: "income" },
+    { key: "ledger", title: l.reports, value: formatCurrency(summary.balance, currency), text: l.reportsText, tone: "report" },
     { key: "pooja", title: l.poojaCalendar, value: String(summary.monthPoojas), text: l.poojaCalendarText, tone: "pooja" },
     { key: session.user.role === "MANAGER" ? "approvals" : "admin", title: session.user.role === "MANAGER" ? l.approvals : l.admin, value: String(summary.pendingApprovals), text: l.approvalsText, tone: "admin" }
   ];
@@ -317,7 +326,7 @@ function TransactionForm({ type, onDone }: { type: "INCOME" | "EXPENSE"; onDone:
   );
 }
 
-function LedgerView({ session, refreshKey, onDone }: { session: Session; refreshKey: number; onDone: () => void }) {
+function LedgerView({ session, refreshKey, onDone, currency }: { session: Session; refreshKey: number; onDone: () => void; currency?: string }) {
   const [rows, setRows] = useState<LedgerRow[]>([]);
   const [categories, setCategories] = useState<{ income: Category[]; expense: Category[] }>({ income: [], expense: [] });
   const [editing, setEditing] = useState<LedgerRow | null>(null);
@@ -475,7 +484,7 @@ function LedgerView({ session, refreshKey, onDone }: { session: Session; refresh
               )}
             </div>
           </div>
-          <strong>{formatCurrency(row.amount)}</strong>
+          <strong>{formatCurrency(row.amount, currency)}</strong>
         </article>
       ))}
       {rows.length === 0 ? <p className="subtle">No ledger entries yet.</p> : null}
@@ -484,7 +493,7 @@ function LedgerView({ session, refreshKey, onDone }: { session: Session; refresh
   );
 }
 
-function ApprovalsView({ onDone }: { onDone: () => void }) {
+function ApprovalsView({ onDone, currency }: { onDone: () => void; currency?: string }) {
   const [rows, setRows] = useState<ApprovalRow[]>([]);
   const l = useLabels();
   const load = () => fetchApprovals().then(setRows).catch(console.error);
@@ -504,7 +513,7 @@ function ApprovalsView({ onDone }: { onDone: () => void }) {
       {rows.map((row) => (
         <article key={row.id} className="approval-card">
           <p className="eyebrow">{row.categoryName ?? "Expense"} · {row.transactionDate}</p>
-          <h3>{formatCurrency(row.amount)}</h3>
+          <h3>{formatCurrency(row.amount, currency)}</h3>
           <p>{row.notes || "Approval requested"}</p>
           <small>{l.requestedBy} {row.requestedByName}</small>
           <div className="button-row">
@@ -679,6 +688,7 @@ function TemplesTab() {
     address: "",
     approvalThreshold: "2000",
     defaultLanguage: "en",
+    currency: "INR",
     adminName: "",
     adminEmail: "",
     adminPassword: "",
@@ -695,7 +705,7 @@ function TemplesTab() {
   function openForm() {
     setCreated(null);
     setMessage("");
-    setForm({ name: "", slug: "", address: "", approvalThreshold: "2000", defaultLanguage: "en", adminName: "", adminEmail: "", adminPassword: "" });
+    setForm({ name: "", slug: "", address: "", approvalThreshold: "2000", defaultLanguage: "en", currency: "INR", adminName: "", adminEmail: "", adminPassword: "" });
     setIsFormOpen(true);
   }
 
@@ -713,6 +723,7 @@ function TemplesTab() {
         address: form.address,
         approvalThreshold: Number(form.approvalThreshold || 2000),
         defaultLanguage: form.defaultLanguage,
+        currency: form.currency,
         adminName: form.adminName,
         adminEmail: form.adminEmail,
         adminPassword: form.adminPassword,
@@ -776,6 +787,7 @@ function TemplesTab() {
                 <label>{l.approvalThreshold}<input inputMode="decimal" value={form.approvalThreshold} onChange={(event) => setForm({ ...form, approvalThreshold: event.target.value })} /></label>
                 <label>{l.defaultLanguage}<select value={form.defaultLanguage} onChange={(event) => setForm({ ...form, defaultLanguage: event.target.value })}><option value="en">{l.english}</option><option value="kn">{l.kannada}</option></select></label>
               </div>
+              <label>{l.currency}<select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value })}><option value="INR">{l.indianRupee}</option><option value="GBP">{l.britishPound}</option><option value="USD">{l.usDollar}</option></select></label>
               <div className="section-title">
                 <h2>{l.admin}</h2>
               </div>
@@ -794,7 +806,7 @@ function TemplesTab() {
 
 function SettingsTab({ onSettingsChange }: { onSettingsChange: (settings: Partial<TempleSettings>) => void }) {
   const l = useLabels();
-  const [form, setForm] = useState({ name: "", address: "", logoUrl: "", approvalThreshold: "", defaultLanguage: "en" });
+  const [form, setForm] = useState({ name: "", address: "", logoUrl: "", approvalThreshold: "", defaultLanguage: "en", currency: "INR" });
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -805,6 +817,7 @@ function SettingsTab({ onSettingsChange }: { onSettingsChange: (settings: Partia
         logoUrl: temple.logoUrl ?? "",
         approvalThreshold: String(temple.approvalThreshold),
         defaultLanguage: temple.defaultLanguage || "en",
+        currency: temple.currency || "INR",
       }))
       .catch((err) => setMessage(err instanceof Error ? err.message : "Unable to load temple settings"));
   }, []);
@@ -819,6 +832,7 @@ function SettingsTab({ onSettingsChange }: { onSettingsChange: (settings: Partia
         logoUrl: form.logoUrl,
         approvalThreshold: Number(form.approvalThreshold || 0),
         defaultLanguage: form.defaultLanguage,
+        currency: form.currency,
       });
       onSettingsChange(saved);
       setMessage("Temple settings saved.");
@@ -836,6 +850,7 @@ function SettingsTab({ onSettingsChange }: { onSettingsChange: (settings: Partia
         <label>{l.approvalThreshold}<input inputMode="decimal" value={form.approvalThreshold} onChange={(event) => setForm({ ...form, approvalThreshold: event.target.value })} /></label>
         <label>{l.defaultLanguage}<select value={form.defaultLanguage} onChange={(event) => setForm({ ...form, defaultLanguage: event.target.value })}><option value="en">{l.english}</option><option value="kn">{l.kannada}</option></select></label>
       </div>
+      <label>{l.currency}<select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value })}><option value="INR">{l.indianRupee}</option><option value="GBP">{l.britishPound}</option><option value="USD">{l.usDollar}</option></select></label>
       {message ? <p className="notice">{message}</p> : null}
       <button className="primary-button">{l.saveChanges}</button>
     </form>

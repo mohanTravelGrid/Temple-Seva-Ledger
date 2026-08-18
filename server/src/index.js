@@ -146,6 +146,7 @@ app.get("/api/:templeSlug/public", (req, res) => {
     logoUrl: temple.logo_url,
     approvalThreshold: temple.approval_threshold,
     defaultLanguage: temple.default_language,
+    currency: temple.currency || "INR",
   });
 });
 
@@ -434,9 +435,10 @@ app.put("/api/:templeSlug/temple", requireAuth, requireRole("TRUSTEE", "SUPER_TR
     return;
   }
   const defaultLanguage = ["en", "kn"].includes(req.body.defaultLanguage) ? req.body.defaultLanguage : before.default_language;
+  const currency = ["INR", "GBP", "USD"].includes(req.body.currency) ? req.body.currency : before.currency;
   db.prepare(`
     UPDATE temples
-    SET name = ?, address = ?, logo_url = ?, approval_threshold = ?, default_language = ?
+    SET name = ?, address = ?, logo_url = ?, approval_threshold = ?, default_language = ?, currency = ?
     WHERE id = ?
   `).run(
     name,
@@ -444,6 +446,7 @@ app.put("/api/:templeSlug/temple", requireAuth, requireRole("TRUSTEE", "SUPER_TR
     req.body.logoUrl === undefined ? before.logo_url : (req.body.logoUrl || null),
     threshold,
     defaultLanguage,
+    currency,
     before.id,
   );
   const after = db.prepare("SELECT * FROM temples WHERE id = ?").get(before.id);
@@ -464,13 +467,14 @@ app.put("/api/:templeSlug/temple", requireAuth, requireRole("TRUSTEE", "SUPER_TR
     logoUrl: after.logo_url,
     approvalThreshold: after.approval_threshold,
     defaultLanguage: after.default_language,
+    currency: after.currency || "INR",
   });
 });
 
 app.get("/api/:templeSlug/admin/temples", requireAuth, requireRole("SUPER_TRUSTEE"), (req, res) => {
   ok(res, db.prepare(`
     SELECT id, slug, name, address, approval_threshold AS approvalThreshold,
-           default_language AS defaultLanguage, active
+           default_language AS defaultLanguage, currency, active
     FROM temples ORDER BY id
   `).all());
 });
@@ -502,14 +506,15 @@ app.post("/api/:templeSlug/admin/temples", requireAuth, requireRole("SUPER_TRUST
     return;
   }
   const result = db.prepare(`
-    INSERT INTO temples (slug, name, address, approval_threshold, default_language)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO temples (slug, name, address, approval_threshold, default_language, currency)
+    VALUES (?, ?, ?, ?, ?, ?)
   `).run(
     slug,
     name,
     req.body.address || null,
     Number(req.body.approvalThreshold ?? 2000),
     ["en", "kn"].includes(req.body.defaultLanguage) ? req.body.defaultLanguage : "en",
+    ["INR", "GBP", "USD"].includes(req.body.currency) ? req.body.currency : "INR",
   );
   const templeId = result.lastInsertRowid;
   seedCategories(templeId);

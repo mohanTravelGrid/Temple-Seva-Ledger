@@ -95,6 +95,7 @@ export type TempleSettings = {
   logoUrl?: string | null;
   approvalThreshold: number;
   defaultLanguage: string;
+  currency: string;
 };
 
 export type AdminTemple = {
@@ -104,6 +105,7 @@ export type AdminTemple = {
   address?: string | null;
   approvalThreshold: number;
   defaultLanguage: string;
+  currency: string;
   active: number;
 };
 
@@ -155,7 +157,7 @@ async function request<T>(path: string, options: RequestInit = {}) {
 }
 
 export function fetchTemplePublic() {
-  return request<{ slug: string; name: string; address?: string; logoUrl?: string; approvalThreshold: number; defaultLanguage: string }>("/public");
+  return request<{ slug: string; name: string; address?: string; logoUrl?: string; approvalThreshold: number; defaultLanguage: string; currency: string }>("/public");
 }
 
 export function login(email: string, password: string) {

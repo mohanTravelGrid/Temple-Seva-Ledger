@@ -49,6 +49,7 @@ export function initDb() {
       logo_url TEXT,
       approval_threshold REAL NOT NULL DEFAULT 2000,
       default_language TEXT NOT NULL DEFAULT 'en',
+      currency TEXT NOT NULL DEFAULT 'INR',
       active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -152,6 +153,7 @@ export function initDb() {
   addColumnIfMissing("pooja_bookings", "updated_at", "TEXT");
   addColumnIfMissing("pooja_bookings", "income_transaction_id", "INTEGER REFERENCES transactions(id)");
   addColumnIfMissing("users", "updated_at", "TEXT");
+  addColumnIfMissing("temples", "currency", "TEXT NOT NULL DEFAULT 'INR'");
 
   const existing = db.prepare("SELECT id FROM temples WHERE slug = ?").get("hanumagiri");
   if (existing) return;

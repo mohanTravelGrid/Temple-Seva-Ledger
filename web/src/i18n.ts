@@ -111,6 +111,10 @@ const labels = {
   open: "Open",
   tslSevaControl: "TSL Seva Control — Module Linkage & MIS Flow",
   tslIsolationProof: "Verify Data Isolation",
+  currency: "Currency",
+  indianRupee: "Indian Rupee (INR)",
+  britishPound: "British Pound (GBP)",
+  usDollar: "US Dollar (USD)",
 } as const;
 
 const labelsKn: Record<keyof typeof labels, string> = {
@@ -224,6 +228,10 @@ const labelsKn: Record<keyof typeof labels, string> = {
   open: "ತೆರೆಯಿರಿ",
   tslSevaControl: "TSL ಸೇವಾ ನಿಯಂತ್ರಣ — ಮಾಡ್ಯೂಲ್ ಸಂಪರ್ಕ ಮತ್ತು MIS ಹರಿವು",
   tslIsolationProof: "ಡೇಟಾ ಪ್ರತ್ಯೇಕತೆ ಪರಿಶೀಲಿಸಿ",
+  currency: "ಕರೆನ್ಸಿ",
+  indianRupee: "ಭಾರತೀಯ ರೂಪಾಯಿ (INR)",
+  britishPound: "ಬ್ರಿಟಿಷ್ ಪೌಂಡ್ (GBP)",
+  usDollar: "ಅಮೆರಿಕನ್ ಡಾಲರ್ (USD)",
 };
 
 export const allLabels: Record<LangCode, Record<keyof typeof labels, string>> = {
