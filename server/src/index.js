@@ -843,6 +843,20 @@ app.delete("/api/:templeSlug/pooja-bookings/:id", requireAuth, (req, res) => {
 
 const webDist = join(process.cwd(), "web", "dist");
 if (existsSync(webDist)) {
+  app.get("/manifest.webmanifest", (req, res) => {
+    const slug = (req.query.slug || "hanumagiri").replace(/[^a-z0-9-]/gi, "");
+    res.json({
+      name: "Temple Seva Ledger",
+      short_name: "TSL",
+      description: "Temple income, expenses, approvals, ledger, and seva calendar.",
+      start_url: "/" + slug,
+      scope: "/",
+      display: "standalone",
+      background_color: "#eef4ff",
+      theme_color: "#1f6f5b",
+      icons: [{ src: "/icon.svg", sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }]
+    });
+  });
   app.use(express.static(webDist));
   app.use((req, res, next) => {
     if (req.method !== "GET") return next();

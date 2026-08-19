@@ -2,7 +2,7 @@
   "name": "Temple Seva Ledger",
   "short_name": "TSL",
   "description": "Temple income, expenses, approvals, ledger, and seva calendar.",
-  "start_url": "/hanumagiri",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#eef4ff",
