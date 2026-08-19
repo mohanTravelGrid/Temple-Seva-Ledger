@@ -5,7 +5,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import Database from "better-sqlite3";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || join(__dirname, "..", "data");
+const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DB_PATH || join(__dirname, "..", "data");
 mkdirSync(dataDir, { recursive: true });
 
 export const db = new Database(join(dataDir, "temple-seva-ledger.db"));
