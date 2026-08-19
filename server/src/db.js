@@ -5,10 +5,11 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import Database from "better-sqlite3";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DB_PATH || (process.env.DATABASE_URL ? dirname(process.env.DATABASE_URL) : null) || join(__dirname, "..", "data");
+const isRailway = !!process.env.RAILWAY_ENVIRONMENT;
+const dataDir = isRailway ? "/app/data" : join(__dirname, "..", "data");
 mkdirSync(dataDir, { recursive: true });
 
-const dbFile = process.env.DATABASE_URL || join(dataDir, "temple-seva-ledger.db");
+const dbFile = join(dataDir, "temple-seva-ledger.db");
 export const db = new Database(dbFile);
 db.pragma("foreign_keys = ON");
 
