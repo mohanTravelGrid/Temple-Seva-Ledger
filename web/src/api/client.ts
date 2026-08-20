@@ -298,3 +298,246 @@ export function createAdminTemple(payload: Record<string, string | number>) {
     body: JSON.stringify(payload)
   });
 }
+
+// ─── Inventory Types & Functions ────────────────────────────────────────────────
+
+export type InventoryItem = {
+  id: number;
+  temple_id: number;
+  name: string;
+  unit: string;
+  current_stock: number;
+  min_stock: number;
+  cost_per_unit: number;
+  category: string;
+  active: number;
+  created_at: string;
+  updated_at: string | null;
+};
+
+export type InventoryLog = {
+  id: number;
+  item_id: number;
+  type: string;
+  quantity: number;
+  reference_type: string | null;
+  reference_id: number | null;
+  notes: string | null;
+  performedByName: string;
+  itemName: string;
+  itemUnit: string;
+  created_at: string;
+};
+
+export type PoojaMaterial = {
+  id: number;
+  temple_id: number;
+  pooja_type: string;
+  item_id: number;
+  quantity_per_pooja: number;
+  itemName: string;
+  itemUnit: string;
+};
+
+export function fetchInventory() {
+  return request<InventoryItem[]>("/inventory");
+}
+
+export function createInventoryItem(payload: Record<string, string | number>) {
+  return request<InventoryItem>("/inventory", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateInventoryItem(id: number, payload: Record<string, string | number>) {
+  return request<InventoryItem>(`/inventory/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function purchaseInventoryItem(id: number, payload: Record<string, string | number>) {
+  return request<InventoryItem>(`/inventory/${id}/purchase`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function adjustInventoryItem(id: number, payload: Record<string, string | number>) {
+  return request<InventoryItem>(`/inventory/${id}/adjust`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchLowStockItems() {
+  return request<InventoryItem[]>("/inventory/low-stock");
+}
+
+export function fetchInventoryLog() {
+  return request<InventoryLog[]>("/inventory/log");
+}
+
+export function fetchPoojaMaterials() {
+  return request<PoojaMaterial[]>("/pooja-materials");
+}
+
+export function upsertPoojaMaterial(payload: Record<string, string | number>) {
+  return request<PoojaMaterial>("/pooja-materials", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deletePoojaMaterial(id: number) {
+  return request<{ id: number }>(`/pooja-materials/${id}`, {
+    method: "DELETE"
+  });
+}
+
+export function consumePoojaMaterials(poojaType: string, bookingId?: number) {
+  return request<{ consumed: number; poojaType: string }>("/pooja-materials/consume", {
+    method: "POST",
+    body: JSON.stringify({ poojaType, bookingId })
+  });
+}
+
+// ─── Events Types & Functions ──────────────────────────────────────────────────
+
+export type EventRow = {
+  id: number;
+  temple_id: number;
+  name: string;
+  event_date: string;
+  end_date: string | null;
+  description: string | null;
+  budget: number;
+  actual_cost: number;
+  status: string;
+  recurrence: string;
+  created_by_user_id: number;
+  active: number;
+  created_at: string;
+  updated_at: string | null;
+  totalTasks?: number;
+  doneTasks?: number;
+  totalExpenses?: number;
+  createdByName?: string;
+};
+
+export type EventTask = {
+  id: number;
+  temple_id: number;
+  event_id: number;
+  title: string;
+  assigned_to: number | null;
+  status: string;
+  due_date: string | null;
+  notes: string | null;
+  assignedToName: string | null;
+  created_at: string;
+};
+
+export type EventPooja = {
+  id: number;
+  temple_id: number;
+  event_id: number;
+  pooja_type: string;
+  scheduled_date: string;
+  amount: number;
+  booking_id: number | null;
+  devoteeName: string | null;
+  created_at: string;
+};
+
+export type EventExpense = {
+  id: number;
+  temple_id: number;
+  event_id: number;
+  transaction_id: number | null;
+  description: string | null;
+  amount: number;
+  txnAmount: number | null;
+  txnNotes: string | null;
+  txnDate: string | null;
+  created_at: string;
+};
+
+export type EventDetail = {
+  event: EventRow;
+  tasks: EventTask[];
+  poojas: EventPooja[];
+  expenses: EventExpense[];
+};
+
+export type EventSummary = {
+  event: EventRow;
+  totalTasks: number;
+  doneTasks: number;
+  totalPoojas: number;
+  poojaRevenue: number;
+  totalExpenses: number;
+  balance: number;
+};
+
+export function fetchEvents(month?: string) {
+  const q = month ? `?month=${encodeURIComponent(month)}` : "";
+  return request<EventRow[]>(`/events${q}`);
+}
+
+export function createEvent(payload: Record<string, string | number | null>) {
+  return request<EventRow>("/events", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateEvent(id: number, payload: Record<string, string | number | null>) {
+  return request<EventRow>(`/events/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteEvent(id: number) {
+  return request<{ id: number }>(`/events/${id}`, {
+    method: "DELETE"
+  });
+}
+
+export function fetchEventDetail(id: number) {
+  return request<EventDetail>(`/events/${id}`);
+}
+
+export function createEventTask(eventId: number, payload: Record<string, string | number>) {
+  return request<EventTask>(`/events/${eventId}/tasks`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateEventTask(eventId: number, taskId: number, payload: Record<string, string | number>) {
+  return request<EventTask>(`/events/${eventId}/tasks/${taskId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function createEventPooja(eventId: number, payload: Record<string, string | number | boolean>) {
+  return request<EventPooja>(`/events/${eventId}/poojas`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function createEventExpense(eventId: number, payload: Record<string, string | number>) {
+  return request<EventExpense & { transactionStatus?: string }>(`/events/${eventId}/expenses`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchEventSummary(id: number) {
+  return request<EventSummary>(`/events/${id}/summary`);
+}

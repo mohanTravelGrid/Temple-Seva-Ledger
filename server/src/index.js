@@ -841,6 +841,409 @@ app.delete("/api/:templeSlug/pooja-bookings/:id", requireAuth, (req, res) => {
   ok(res, { id: before.id });
 });
 
+// ─── Inventory Endpoints ────────────────────────────────────────────────────────
+
+app.get("/api/:templeSlug/inventory", requireAuth, (req, res) => {
+  const items = db.prepare(`
+    SELECT * FROM inventory_items WHERE temple_id = ? AND active = 1 ORDER BY category, name
+  `).all(req.temple.id);
+  ok(res, items);
+});
+
+app.post("/api/:templeSlug/inventory", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+  const name = String(req.body.name ?? "").trim();
+  const unit = String(req.body.unit ?? "PIECE").toUpperCase();
+  if (!name || !["PIECE", "KG", "LITRE", "PACKET", "DOZEN"].includes(unit)) {
+    res.status(400).json({ message: "Name and valid unit are required" });
+    return;
+  }
+  const result = db.prepare(`
+    INSERT INTO inventory_items (temple_id, name, unit, current_stock, min_stock, cost_per_unit, category)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    req.temple.id, name, unit,
+    Number(req.body.currentStock ?? 0),
+    Number(req.body.minStock ?? 0),
+    Number(req.body.costPerUnit ?? 0),
+    req.body.category || "POOJA_ITEM"
+  );
+  const item = db.prepare("SELECT * FROM inventory_items WHERE id = ? AND temple_id = ?").get(result.lastInsertRowid, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "INVENTORY_ITEM", entityId: result.lastInsertRowid, action: "CREATE", userId: req.user.id, after: item });
+  ok(res, item);
+});
+
+app.put("/api/:templeSlug/inventory/:id", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+  const before = db.prepare("SELECT * FROM inventory_items WHERE id = ? AND temple_id = ?").get(req.params.id, req.temple.id);
+  if (!before) { res.status(404).json({ message: "Item not found" }); return; }
+  db.prepare(`
+    UPDATE inventory_items SET name = ?, unit = ?, min_stock = ?, cost_per_unit = ?, category = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND temple_id = ?
+  `).run(
+    req.body.name === undefined ? before.name : String(req.body.name).trim() || before.name,
+    req.body.unit || before.unit,
+    req.body.minStock === undefined ? before.min_stock : Number(req.body.minStock),
+    req.body.costPerUnit === undefined ? before.cost_per_unit : Number(req.body.costPerUnit),
+    req.body.category || before.category,
+    before.id, req.temple.id
+  );
+  const after = db.prepare("SELECT * FROM inventory_items WHERE id = ? AND temple_id = ?").get(before.id, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "INVENTORY_ITEM", entityId: before.id, action: "UPDATE", userId: req.user.id, before, after });
+  ok(res, after);
+});
+
+app.post("/api/:templeSlug/inventory/:id/purchase", requireAuth, (req, res) => {
+  const item = db.prepare("SELECT * FROM inventory_items WHERE id = ? AND temple_id = ?").get(req.params.id, req.temple.id);
+  if (!item) { res.status(404).json({ message: "Item not found" }); return; }
+  const qty = Number(req.body.quantity ?? 0);
+  if (!(qty > 0)) { res.status(400).json({ message: "Positive quantity required" }); return; }
+  db.prepare("UPDATE inventory_items SET current_stock = current_stock + ?, cost_per_unit = COALESCE(?, cost_per_unit), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND temple_id = ?")
+    .run(qty, req.body.costPerUnit ? Number(req.body.costPerUnit) : null, item.id, req.temple.id);
+  db.prepare("INSERT INTO inventory_transactions (temple_id, item_id, type, quantity, notes, performed_by_user_id) VALUES (?, ?, 'PURCHASE', ?, ?, ?)")
+    .run(req.temple.id, item.id, qty, req.body.notes || null, req.user.id);
+  const after = db.prepare("SELECT * FROM inventory_items WHERE id = ? AND temple_id = ?").get(item.id, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "INVENTORY_ITEM", entityId: item.id, action: "UPDATE", userId: req.user.id, before: item, after, comments: `Purchase: +${qty} ${item.unit}` });
+  ok(res, after);
+});
+
+app.post("/api/:templeSlug/inventory/:id/adjust", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+  const item = db.prepare("SELECT * FROM inventory_items WHERE id = ? AND temple_id = ?").get(req.params.id, req.temple.id);
+  if (!item) { res.status(404).json({ message: "Item not found" }); return; }
+  const qty = Number(req.body.quantity ?? 0);
+  if (qty === 0) { res.status(400).json({ message: "Adjustment quantity cannot be zero" }); return; }
+  const newStock = Math.max(0, item.current_stock + qty);
+  db.prepare("UPDATE inventory_items SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND temple_id = ?")
+    .run(newStock, item.id, req.temple.id);
+  db.prepare("INSERT INTO inventory_transactions (temple_id, item_id, type, quantity, notes, performed_by_user_id) VALUES (?, ?, 'ADJUSTMENT', ?, ?, ?)")
+    .run(req.temple.id, item.id, qty, req.body.notes || "Manual adjustment", req.user.id);
+  const after = db.prepare("SELECT * FROM inventory_items WHERE id = ? AND temple_id = ?").get(item.id, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "INVENTORY_ITEM", entityId: item.id, action: "UPDATE", userId: req.user.id, before: item, after, comments: `Adjustment: ${qty > 0 ? '+' : ''}${qty}` });
+  ok(res, after);
+});
+
+app.get("/api/:templeSlug/inventory/low-stock", requireAuth, (req, res) => {
+  const items = db.prepare(`
+    SELECT * FROM inventory_items WHERE temple_id = ? AND active = 1 AND current_stock <= min_stock ORDER BY (current_stock / CASE WHEN min_stock = 0 THEN 1 ELSE min_stock END), name
+  `).all(req.temple.id);
+  ok(res, items);
+});
+
+app.get("/api/:templeSlug/inventory/log", requireAuth, (req, res) => {
+  const rows = db.prepare(`
+    SELECT it.*, ii.name itemName, ii.unit itemUnit, u.name performedByName
+    FROM inventory_transactions it
+    JOIN inventory_items ii ON ii.id = it.item_id
+    JOIN users u ON u.id = it.performed_by_user_id
+    WHERE it.temple_id = ?
+    ORDER BY it.created_at DESC
+    LIMIT 100
+  `).all(req.temple.id);
+  ok(res, rows);
+});
+
+// ─── Pooja Materials Endpoints ─────────────────────────────────────────────────
+
+app.get("/api/:templeSlug/pooja-materials", requireAuth, (req, res) => {
+  const rows = db.prepare(`
+    SELECT pm.*, ii.name itemName, ii.unit itemUnit
+    FROM pooja_materials pm
+    JOIN inventory_items ii ON ii.id = pm.item_id
+    WHERE pm.temple_id = ?
+    ORDER BY pm.pooja_type, ii.name
+  `).all(req.temple.id);
+  ok(res, rows);
+});
+
+app.post("/api/:templeSlug/pooja-materials", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+  const poojaType = String(req.body.poojaType ?? "").trim();
+  const itemId = Number(req.body.itemId || 0);
+  const qty = Number(req.body.quantityPerPooja ?? 1);
+  if (!poojaType || !itemId || !(qty > 0)) {
+    res.status(400).json({ message: "Pooja type, item, and positive quantity are required" });
+    return;
+  }
+  const item = db.prepare("SELECT id FROM inventory_items WHERE id = ? AND temple_id = ?").get(itemId, req.temple.id);
+  if (!item) { res.status(400).json({ message: "Invalid inventory item" }); return; }
+  db.prepare(`
+    INSERT INTO pooja_materials (temple_id, pooja_type, item_id, quantity_per_pooja)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(temple_id, pooja_type, item_id) DO UPDATE SET quantity_per_pooja = excluded.quantity_per_pooja
+  `).run(req.temple.id, poojaType, itemId, qty);
+  const row = db.prepare(`
+    SELECT pm.*, ii.name itemName, ii.unit itemUnit
+    FROM pooja_materials pm JOIN inventory_items ii ON ii.id = pm.item_id
+    WHERE pm.temple_id = ? AND pm.pooja_type = ? AND pm.item_id = ?
+  `).get(req.temple.id, poojaType, itemId);
+  ok(res, row);
+});
+
+app.delete("/api/:templeSlug/pooja-materials/:id", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+  const row = db.prepare("SELECT * FROM pooja_materials WHERE id = ? AND temple_id = ?").get(req.params.id, req.temple.id);
+  if (!row) { res.status(404).json({ message: "Material mapping not found" }); return; }
+  db.prepare("DELETE FROM pooja_materials WHERE id = ? AND temple_id = ?").run(row.id, req.temple.id);
+  ok(res, { id: row.id });
+});
+
+app.post("/api/:templeSlug/pooja-materials/consume", requireAuth, (req, res) => {
+  const poojaType = String(req.body.poojaType ?? "").trim();
+  const bookingId = Number(req.body.bookingId || 0) || null;
+  if (!poojaType) { res.status(400).json({ message: "Pooja type required" }); return; }
+  const materials = db.prepare("SELECT * FROM pooja_materials WHERE temple_id = ? AND pooja_type = ?").all(req.temple.id, poojaType);
+  if (materials.length === 0) { ok(res, { consumed: 0, message: "No materials mapped for this pooja type" }); return; }
+  const consume = db.transaction(() => {
+    let consumed = 0;
+    for (const mat of materials) {
+      const item = db.prepare("SELECT * FROM inventory_items WHERE id = ? AND temple_id = ?").get(mat.item_id, req.temple.id);
+      if (!item) continue;
+      const deduct = mat.quantity_per_pooja;
+      const newStock = Math.max(0, item.current_stock - deduct);
+      db.prepare("UPDATE inventory_items SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND temple_id = ?")
+        .run(newStock, item.id, req.temple.id);
+      db.prepare("INSERT INTO inventory_transactions (temple_id, item_id, type, quantity, reference_type, reference_id, notes, performed_by_user_id) VALUES (?, ?, 'CONSUMPTION', ?, 'POOJA_BOOKING', ?, ?, ?)")
+        .run(req.temple.id, item.id, -deduct, bookingId, `Consumed for ${poojaType}`, req.user.id);
+      consumed++;
+    }
+    return consumed;
+  });
+  const count = consume();
+  ok(res, { consumed: count, poojaType });
+});
+
+// ─── Events Endpoints ──────────────────────────────────────────────────────────
+
+app.get("/api/:templeSlug/events", requireAuth, (req, res) => {
+  const month = String(req.query.month ?? "").trim();
+  let rows;
+  if (/^\d{4}-\d{2}$/.test(month)) {
+    rows = db.prepare(`
+      SELECT e.*,
+        (SELECT COUNT(*) FROM event_tasks WHERE event_id = e.id) totalTasks,
+        (SELECT COUNT(*) FROM event_tasks WHERE event_id = e.id AND status = 'DONE') doneTasks,
+        (SELECT COALESCE(SUM(amount), 0) FROM event_expenses WHERE event_id = e.id) totalExpenses,
+        u.name createdByName
+      FROM events e
+      JOIN users u ON u.id = e.created_by_user_id
+      WHERE e.temple_id = ? AND e.active = 1 AND (e.event_date LIKE ? OR e.end_date LIKE ?)
+      ORDER BY e.event_date
+    `).all(req.temple.id, `${month}%`, `${month}%`);
+  } else {
+    rows = db.prepare(`
+      SELECT e.*,
+        (SELECT COUNT(*) FROM event_tasks WHERE event_id = e.id) totalTasks,
+        (SELECT COUNT(*) FROM event_tasks WHERE event_id = e.id AND status = 'DONE') doneTasks,
+        (SELECT COALESCE(SUM(amount), 0) FROM event_expenses WHERE event_id = e.id) totalExpenses,
+        u.name createdByName
+      FROM events e
+      JOIN users u ON u.id = e.created_by_user_id
+      WHERE e.temple_id = ? AND e.active = 1
+      ORDER BY e.event_date DESC
+      LIMIT 50
+    `).all(req.temple.id);
+  }
+  ok(res, rows);
+});
+
+app.post("/api/:templeSlug/events", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+  const name = String(req.body.name ?? "").trim();
+  const eventDate = String(req.body.eventDate ?? "").trim();
+  if (!name || !eventDate) { res.status(400).json({ message: "Event name and date are required" }); return; }
+  const result = db.prepare(`
+    INSERT INTO events (temple_id, name, event_date, end_date, description, budget, status, recurrence, created_by_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    req.temple.id, name, eventDate,
+    req.body.endDate || null,
+    req.body.description || null,
+    Number(req.body.budget ?? 0),
+    req.body.status || "PLANNED",
+    req.body.recurrence || "NONE",
+    req.user.id
+  );
+  const event = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ?").get(result.lastInsertRowid, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "EVENT", entityId: result.lastInsertRowid, action: "CREATE", userId: req.user.id, after: event });
+  ok(res, event);
+});
+
+app.put("/api/:templeSlug/events/:id", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+  const before = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ? AND active = 1").get(req.params.id, req.temple.id);
+  if (!before) { res.status(404).json({ message: "Event not found" }); return; }
+  db.prepare(`
+    UPDATE events SET name = ?, event_date = ?, end_date = ?, description = ?, budget = ?, actual_cost = ?, status = ?, recurrence = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND temple_id = ?
+  `).run(
+    req.body.name || before.name,
+    req.body.eventDate || before.event_date,
+    req.body.endDate === undefined ? before.end_date : req.body.endDate || null,
+    req.body.description === undefined ? before.description : req.body.description || null,
+    req.body.budget === undefined ? before.budget : Number(req.body.budget),
+    req.body.actualCost === undefined ? before.actual_cost : Number(req.body.actualCost),
+    req.body.status || before.status,
+    req.body.recurrence || before.recurrence,
+    before.id, req.temple.id
+  );
+  const after = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ?").get(before.id, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "EVENT", entityId: before.id, action: "UPDATE", userId: req.user.id, before, after });
+  ok(res, after);
+});
+
+app.delete("/api/:templeSlug/events/:id", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+  const before = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ? AND active = 1").get(req.params.id, req.temple.id);
+  if (!before) { res.status(404).json({ message: "Event not found" }); return; }
+  db.prepare("UPDATE events SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND temple_id = ?").run(before.id, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "EVENT", entityId: before.id, action: "DELETE", userId: req.user.id, before });
+  ok(res, { id: before.id });
+});
+
+app.get("/api/:templeSlug/events/:id", requireAuth, (req, res) => {
+  const event = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ? AND active = 1").get(req.params.id, req.temple.id);
+  if (!event) { res.status(404).json({ message: "Event not found" }); return; }
+  const tasks = db.prepare(`
+    SELECT et.*, u.name assignedToName
+    FROM event_tasks et LEFT JOIN users u ON u.id = et.assigned_to
+    WHERE et.event_id = ? AND et.temple_id = ?
+    ORDER BY et.due_date, et.title
+  `).all(event.id, req.temple.id);
+  const poojas = db.prepare(`
+    SELECT ep.*, pb.devotee_name devoteeName
+    FROM event_poojas ep LEFT JOIN pooja_bookings pb ON pb.id = ep.booking_id
+    WHERE ep.event_id = ? AND ep.temple_id = ?
+    ORDER BY ep.scheduled_date
+  `).all(event.id, req.temple.id);
+  const expenses = db.prepare(`
+    SELECT ee.*, t.amount txnAmount, t.notes txnNotes, t.transaction_date txnDate
+    FROM event_expenses ee LEFT JOIN transactions t ON t.id = ee.transaction_id
+    WHERE ee.event_id = ? AND ee.temple_id = ?
+    ORDER BY ee.created_at DESC
+  `).all(event.id, req.temple.id);
+  ok(res, { event, tasks, poojas, expenses });
+});
+
+app.post("/api/:templeSlug/events/:id/tasks", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+  const event = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ? AND active = 1").get(req.params.id, req.temple.id);
+  if (!event) { res.status(404).json({ message: "Event not found" }); return; }
+  const title = String(req.body.title ?? "").trim();
+  if (!title) { res.status(400).json({ message: "Task title required" }); return; }
+  const result = db.prepare(`
+    INSERT INTO event_tasks (temple_id, event_id, title, assigned_to, due_date, notes)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(req.temple.id, event.id, title, req.body.assignedTo ? Number(req.body.assignedTo) : null, req.body.dueDate || null, req.body.notes || null);
+  const task = db.prepare(`
+    SELECT et.*, u.name assignedToName FROM event_tasks et LEFT JOIN users u ON u.id = et.assigned_to
+    WHERE et.id = ? AND et.temple_id = ?
+  `).get(result.lastInsertRowid, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "EVENT_TASK", entityId: result.lastInsertRowid, action: "CREATE", userId: req.user.id, after: task });
+  ok(res, task);
+});
+
+app.put("/api/:templeSlug/events/:id/tasks/:taskId", requireAuth, (req, res) => {
+  const task = db.prepare("SELECT * FROM event_tasks WHERE id = ? AND event_id = ? AND temple_id = ?").get(req.params.taskId, req.params.id, req.temple.id);
+  if (!task) { res.status(404).json({ message: "Task not found" }); return; }
+  db.prepare(`
+    UPDATE event_tasks SET title = ?, assigned_to = ?, status = ?, due_date = ?, notes = ?
+    WHERE id = ? AND temple_id = ?
+  `).run(
+    req.body.title || task.title,
+    req.body.assignedTo === undefined ? task.assigned_to : (req.body.assignedTo ? Number(req.body.assignedTo) : null),
+    req.body.status || task.status,
+    req.body.dueDate === undefined ? task.due_date : req.body.dueDate || null,
+    req.body.notes === undefined ? task.notes : req.body.notes || null,
+    task.id, req.temple.id
+  );
+  const after = db.prepare(`
+    SELECT et.*, u.name assignedToName FROM event_tasks et LEFT JOIN users u ON u.id = et.assigned_to
+    WHERE et.id = ? AND et.temple_id = ?
+  `).get(task.id, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "EVENT_TASK", entityId: task.id, action: "UPDATE", userId: req.user.id, before: task, after });
+  ok(res, after);
+});
+
+app.post("/api/:templeSlug/events/:id/poojas", requireAuth, (req, res) => {
+  const event = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ? AND active = 1").get(req.params.id, req.temple.id);
+  if (!event) { res.status(404).json({ message: "Event not found" }); return; }
+  const poojaType = String(req.body.poojaType ?? "").trim();
+  const scheduledDate = String(req.body.scheduledDate ?? "").trim();
+  if (!poojaType || !scheduledDate) { res.status(400).json({ message: "Pooja type and date required" }); return; }
+  let bookingId = null;
+  if (req.body.createBooking !== false) {
+    const bookingResult = db.prepare(`
+      INSERT INTO pooja_bookings (temple_id, devotee_name, mobile, pooja_type, occasion, occasion_date, amount, notes, created_by_user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      req.temple.id, req.body.devoteeName || event.name, req.body.mobile || null,
+      poojaType, `Event: ${event.name}`, scheduledDate,
+      Number(req.body.amount ?? 0), `Linked to event: ${event.name}`, req.user.id
+    );
+    bookingId = bookingResult.lastInsertRowid;
+    let booking = db.prepare("SELECT * FROM pooja_bookings WHERE id = ? AND temple_id = ?").get(bookingId, req.temple.id);
+    syncPoojaIncomeTransaction({ templeId: req.temple.id, booking, userId: req.user.id });
+  }
+  const result = db.prepare(`
+    INSERT INTO event_poojas (temple_id, event_id, pooja_type, scheduled_date, amount, booking_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(req.temple.id, event.id, poojaType, scheduledDate, Number(req.body.amount ?? 0), bookingId);
+  const row = db.prepare(`
+    SELECT ep.*, pb.devotee_name devoteeName FROM event_poojas ep LEFT JOIN pooja_bookings pb ON pb.id = ep.booking_id
+    WHERE ep.id = ? AND ep.temple_id = ?
+  `).get(result.lastInsertRowid, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "EVENT_POOJA", entityId: result.lastInsertRowid, action: "CREATE", userId: req.user.id, after: row });
+  ok(res, row);
+});
+
+app.post("/api/:templeSlug/events/:id/expenses", requireAuth, (req, res) => {
+  const event = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ? AND active = 1").get(req.params.id, req.temple.id);
+  if (!event) { res.status(404).json({ message: "Event not found" }); return; }
+  const amount = Number(req.body.amount ?? 0);
+  if (!(amount > 0)) { res.status(400).json({ message: "Positive amount required" }); return; }
+  const needsApproval = req.user.role === "MANAGER" && amount > req.temple.approval_threshold;
+  const status = needsApproval ? "PENDING_APPROVAL" : "APPROVED";
+  const txnResult = db.prepare(`
+    INSERT INTO transactions (temple_id, type, category_id, subcategory_id, amount, transaction_date, payment_mode, counterparty_name, notes, status, entered_by_user_id, approved_by_user_id, approved_at)
+    VALUES (?, 'EXPENSE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    req.temple.id,
+    req.body.categoryId ? Number(req.body.categoryId) : null,
+    req.body.subcategoryId ? Number(req.body.subcategoryId) : null,
+    amount,
+    req.body.transactionDate || new Date().toISOString().slice(0, 10),
+    req.body.paymentMode || "CASH",
+    req.body.counterpartyName || null,
+    `Event: ${event.name} - ${req.body.description || ""}`,
+    status,
+    req.user.id,
+    status === "APPROVED" ? req.user.id : null,
+    status === "APPROVED" ? new Date().toISOString() : null
+  );
+  const txnId = txnResult.lastInsertRowid;
+  if (needsApproval) {
+    db.prepare("INSERT INTO approvals (temple_id, transaction_id, requested_by_user_id) VALUES (?, ?, ?)").run(req.temple.id, txnId, req.user.id);
+  }
+  db.prepare("UPDATE events SET actual_cost = actual_cost + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND temple_id = ?").run(amount, event.id, req.temple.id);
+  const result = db.prepare(`
+    INSERT INTO event_expenses (temple_id, event_id, transaction_id, description, amount)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(req.temple.id, event.id, txnId, req.body.description || null, amount);
+  const row = db.prepare(`
+    SELECT ee.*, t.amount txnAmount, t.notes txnNotes, t.transaction_date txnDate
+    FROM event_expenses ee LEFT JOIN transactions t ON t.id = ee.transaction_id
+    WHERE ee.id = ? AND ee.temple_id = ?
+  `).get(result.lastInsertRowid, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "EVENT_EXPENSE", entityId: result.lastInsertRowid, action: "CREATE", userId: req.user.id, after: row });
+  ok(res, { ...row, transactionStatus: status });
+});
+
+app.get("/api/:templeSlug/events/:id/summary", requireAuth, (req, res) => {
+  const event = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ? AND active = 1").get(req.params.id, req.temple.id);
+  if (!event) { res.status(404).json({ message: "Event not found" }); return; }
+  const stats = db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM event_tasks WHERE event_id = ?) totalTasks,
+      (SELECT COUNT(*) FROM event_tasks WHERE event_id = ? AND status = 'DONE') doneTasks,
+      (SELECT COUNT(*) FROM event_poojas WHERE event_id = ?) totalPoojas,
+      (SELECT COALESCE(SUM(amount), 0) FROM event_poojas WHERE event_id = ?) poojaRevenue,
+      (SELECT COALESCE(SUM(amount), 0) FROM event_expenses WHERE event_id = ?) totalExpenses
+  `).get(event.id, event.id, event.id, event.id, event.id);
+  ok(res, { event, ...stats, balance: stats.poojaRevenue - stats.totalExpenses });
+});
+
 const webDist = join(process.cwd(), "web", "dist");
 if (existsSync(webDist)) {
   app.get("/manifest.webmanifest", (req, res) => {

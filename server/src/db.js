@@ -6,7 +6,7 @@ import Database from "better-sqlite3";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isRailway = !!process.env.RAILWAY_ENVIRONMENT;
-const dataDir = isRailway ? "/app/data" : join(__dirname, "..", "data");
+const dataDir = isRailway ? "/app/data" : join(process.cwd(), "app", "data");
 mkdirSync(dataDir, { recursive: true });
 
 const dbFile = join(dataDir, "temple-seva-ledger.db");
@@ -147,6 +147,92 @@ export function initDb() {
       comments TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS inventory_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      temple_id INTEGER NOT NULL REFERENCES temples(id),
+      name TEXT NOT NULL,
+      unit TEXT NOT NULL DEFAULT 'PIECE',
+      current_stock REAL NOT NULL DEFAULT 0,
+      min_stock REAL NOT NULL DEFAULT 0,
+      cost_per_unit REAL NOT NULL DEFAULT 0,
+      category TEXT DEFAULT 'POOJA_ITEM',
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS inventory_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      temple_id INTEGER NOT NULL REFERENCES temples(id),
+      item_id INTEGER NOT NULL REFERENCES inventory_items(id),
+      type TEXT NOT NULL CHECK (type IN ('PURCHASE', 'CONSUMPTION', 'ADJUSTMENT')),
+      quantity REAL NOT NULL,
+      reference_type TEXT,
+      reference_id INTEGER,
+      notes TEXT,
+      performed_by_user_id INTEGER NOT NULL REFERENCES users(id),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS pooja_materials (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      temple_id INTEGER NOT NULL REFERENCES temples(id),
+      pooja_type TEXT NOT NULL,
+      item_id INTEGER NOT NULL REFERENCES inventory_items(id),
+      quantity_per_pooja REAL NOT NULL DEFAULT 1,
+      UNIQUE(temple_id, pooja_type, item_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      temple_id INTEGER NOT NULL REFERENCES temples(id),
+      name TEXT NOT NULL,
+      event_date TEXT NOT NULL,
+      end_date TEXT,
+      description TEXT,
+      budget REAL DEFAULT 0,
+      actual_cost REAL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'PLANNED',
+      recurrence TEXT DEFAULT 'NONE',
+      created_by_user_id INTEGER NOT NULL REFERENCES users(id),
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS event_tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      temple_id INTEGER NOT NULL REFERENCES temples(id),
+      event_id INTEGER NOT NULL REFERENCES events(id),
+      title TEXT NOT NULL,
+      assigned_to INTEGER REFERENCES users(id),
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      due_date TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS event_poojas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      temple_id INTEGER NOT NULL REFERENCES temples(id),
+      event_id INTEGER NOT NULL REFERENCES events(id),
+      pooja_type TEXT NOT NULL,
+      scheduled_date TEXT NOT NULL,
+      amount REAL DEFAULT 0,
+      booking_id INTEGER REFERENCES pooja_bookings(id),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS event_expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      temple_id INTEGER NOT NULL REFERENCES temples(id),
+      event_id INTEGER NOT NULL REFERENCES events(id),
+      transaction_id INTEGER REFERENCES transactions(id),
+      description TEXT,
+      amount REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   addColumnIfMissing("transactions", "unlocked", "INTEGER NOT NULL DEFAULT 0");
@@ -179,6 +265,7 @@ export function initDb() {
   });
 
   seedCategories(templeId);
+  seedInventoryItems(templeId);
 }
 
 export function seedCategories(templeId) {
@@ -224,4 +311,28 @@ export function seedCategories(templeId) {
 
 export function getTempleBySlug(slug) {
   return db.prepare("SELECT * FROM temples WHERE slug = ? AND active = 1").get(slug);
+}
+
+export function seedInventoryItems(templeId) {
+  const items = [
+    { name: "Flowers (Garland)", unit: "PIECE", min: 10, cost: 20, cat: "POOJA_ITEM" },
+    { name: "Camphor", unit: "PACKET", min: 5, cost: 15, cat: "POOJA_ITEM" },
+    { name: "Oil (Puja)", unit: "LITRE", min: 3, cost: 80, cat: "POOJA_ITEM" },
+    { name: "Coconut", unit: "PIECE", min: 10, cost: 15, cat: "POOJA_ITEM" },
+    { name: "Incense Sticks", unit: "PACKET", min: 5, cost: 10, cat: "POOJA_ITEM" },
+    { name: "Vastra (Cloth)", unit: "PIECE", min: 2, cost: 100, cat: "POOJA_ITEM" },
+    { name: "Rice", unit: "KG", min: 5, cost: 40, cat: "POOJA_ITEM" },
+    { name: "Kumkum", unit: "PACKET", min: 3, cost: 10, cat: "POOJA_ITEM" },
+    { name: "Turmeric", unit: "PACKET", min: 3, cost: 12, cat: "POOJA_ITEM" },
+    { name: "Sandalwood Paste", unit: "PACKET", min: 2, cost: 25, cat: "POOJA_ITEM" },
+    { name: "Cleaning Supplies", unit: "PACKET", min: 2, cost: 50, cat: "CLEANING" },
+    { name: "Decoration Flowers", unit: "DOZEN", min: 5, cost: 60, cat: "DECORATION" },
+    { name: "Prasadam Ingredients", unit: "KG", min: 3, cost: 30, cat: "FOOD" },
+  ];
+  const insert = db.prepare(
+    "INSERT INTO inventory_items (temple_id, name, unit, current_stock, min_stock, cost_per_unit, category) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  );
+  items.forEach((item) => {
+    insert.run(templeId, item.name, item.unit, item.min * 2, item.min, item.cost, item.cat);
+  });
 }

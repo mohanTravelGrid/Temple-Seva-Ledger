@@ -521,6 +521,226 @@ textarea {
   background: rgba(123, 132, 148, 0.12);
 }
 
+/* Inventory & Event styles */
+.stock-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(135, 153, 180, 0.24);
+  border-radius: 22px;
+  padding: 15px;
+  box-shadow: 0 12px 24px rgba(49, 72, 102, 0.08);
+}
+
+.stock-card.low {
+  border-left: 5px solid #ef4444;
+  background: linear-gradient(135deg, #ffffff, #fef2f2);
+}
+
+.stock-card.ok {
+  border-left: 5px solid #22c55e;
+}
+
+.stock-info strong {
+  display: block;
+  font-size: 15px;
+}
+
+.stock-info p {
+  color: #536079;
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.stock-value {
+  text-align: right;
+  min-width: 80px;
+}
+
+.stock-value strong {
+  display: block;
+  font-size: 20px;
+}
+
+.stock-value small {
+  color: #6d7890;
+  font-size: 11px;
+}
+
+.stock-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.event-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(135, 153, 180, 0.24);
+  border-radius: 22px;
+  padding: 15px;
+  box-shadow: 0 12px 24px rgba(49, 72, 102, 0.08);
+}
+
+.event-card .event-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.event-card .event-header strong {
+  font-size: 17px;
+}
+
+.event-card p {
+  color: #536079;
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.status-badge.planned {
+  color: #1d4ed8;
+  background: rgba(29, 78, 216, 0.1);
+}
+
+.status-badge.in_progress {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.1);
+}
+
+.status-badge.completed {
+  color: #059669;
+  background: rgba(5, 150, 105, 0.1);
+}
+
+.status-badge.cancelled {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(135, 153, 180, 0.24);
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.progress-bar .fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #1f6f5b;
+  transition: width 0.3s ease;
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(241, 247, 255, 0.7);
+  border: 1px solid rgba(135, 153, 180, 0.18);
+  border-radius: 14px;
+}
+
+.task-row.done {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.task-check {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(31, 111, 91, 0.4);
+  border-radius: 6px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: transparent;
+  color: transparent;
+  font-size: 14px;
+}
+
+.task-check.checked {
+  background: #1f6f5b;
+  border-color: #1f6f5b;
+  color: #fff;
+}
+
+.detail-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 6px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(135, 153, 180, 0.24);
+}
+
+.detail-tabs button {
+  border: 0;
+  border-radius: 14px;
+  padding: 10px;
+  background: transparent;
+  color: #69758a;
+  font-weight: 850;
+  font-size: 13px;
+}
+
+.detail-tabs button.active {
+  color: #1f6f5b;
+  background: rgba(31, 111, 91, 0.12);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.summary-stat {
+  padding: 14px;
+  border: 1px solid rgba(135, 153, 180, 0.18);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.summary-stat span {
+  color: #6d7890;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.summary-stat strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 18px;
+}
+
+@media (max-width: 680px) {
+  .detail-tabs {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (min-width: 760px) {
   .home-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
