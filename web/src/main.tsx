@@ -1171,7 +1171,6 @@ function EventsView({ session }: { session: Session }) {
                   {session.temple?.logoUrl ? <img src={session.temple.logoUrl} alt="Logo" className="poster-logo" /> : null}
                   <h1 className="poster-temple-name">{session.temple?.name || ""}</h1>
                   {detail.event.image_url ? <img src={detail.event.image_url} alt="" className="poster-event-image" /> : null}
-                  <div className="poster-om">ॐ</div>
                   <h2 className="poster-event-name">{detail.event.name}</h2>
                   <div className="poster-details">
                     <p className="poster-date">{detail.event.event_date}{detail.event.end_date ? ` — ${detail.event.end_date}` : ""}</p>

@@ -845,10 +845,10 @@ textarea {
 }
 
 .poster-logo {
-  width: 80px;
-  height: 80px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
-  object-fit: cover;
+  object-fit: contain;
   border: 2px solid var(--accent);
 }
 
@@ -859,12 +859,6 @@ textarea {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin: 0;
-}
-
-.poster-om {
-  font-size: 2rem;
-  color: var(--accent);
-  line-height: 1;
 }
 
 .poster-event-name {
