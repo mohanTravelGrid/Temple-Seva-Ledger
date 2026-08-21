@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import multer from "multer";
-import { mkdirSync, existsSync, renameSync } from "node:fs";
+import { mkdirSync, existsSync, readFileSync, unlinkSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { createSession, requireAuth, requireRole } from "./auth.js";
@@ -12,14 +12,9 @@ initDb();
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
 const uploadDir = join(process.cwd(), "uploads", "receipts");
-const logoDir = join(process.cwd(), "uploads", "logos");
-const eventDir = join(process.cwd(), "uploads", "events");
 mkdirSync(uploadDir, { recursive: true });
-mkdirSync(logoDir, { recursive: true });
-mkdirSync(eventDir, { recursive: true });
 const upload = multer({ dest: uploadDir, limits: { fileSize: 8 * 1024 * 1024 } });
-const uploadLogo = multer({ dest: logoDir, limits: { fileSize: 5 * 1024 * 1024 } });
-const uploadEvent = multer({ dest: eventDir, limits: { fileSize: 5 * 1024 * 1024 } });
+const uploadEvent = multer({ dest: uploadDir, limits: { fileSize: 5 * 1024 * 1024 } });
 
 app.use(cors());
 app.use(express.json());
@@ -27,6 +22,13 @@ app.use("/uploads", express.static(join(process.cwd(), "uploads")));
 
 function ok(res, data) {
   res.json({ data });
+}
+
+function fileToDataUrl(file) {
+  const mime = file.mimetype || "image/png";
+  const b64 = readFileSync(file.path).toString("base64");
+  unlinkSync(file.path);
+  return `data:${mime};base64,${b64}`;
 }
 
 function toAuditJson(value) {
@@ -493,15 +495,13 @@ app.get("/api/:templeSlug/admin/logo", requireAuth, requireRole("TRUSTEE", "SUPE
   ok(res, { logoUrl: temple?.logo_url || null });
 });
 
-app.post("/api/:templeSlug/admin/logo", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), uploadLogo.single("logo"), (req, res) => {
-  if (!req.file) { res.status(400).json({ message: "No file uploaded" }); return; }
-  const ext = req.file.originalname.split(".").pop() || "png";
-  const fileName = `logo-${req.temple.id}-${Date.now()}.${ext}`;
-  renameSync(req.file.path, join(logoDir, fileName));
-  const logoUrl = `/uploads/logos/${fileName}`;
-  db.prepare("UPDATE temples SET logo_url = ? WHERE id = ?").run(logoUrl, req.temple.id);
-  writeAudit({ templeId: req.temple.id, entityType: "TEMPLE", entityId: req.temple.id, action: "UPDATE", userId: req.user.id, before: { logo_url: req.temple.logo_url }, after: { logo_url: logoUrl }, comments: "Logo uploaded" });
-  ok(res, { logoUrl });
+app.post("/api/:templeSlug/admin/logo", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), express.raw({ type: "image/*", limit: "5mb" }), (req, res) => {
+  if (!req.body || !req.body.length) { res.status(400).json({ message: "No image data" }); return; }
+  const mimeType = req.headers["content-type"] || "image/png";
+  const base64 = `data:${mimeType};base64,${req.body.toString("base64")}`;
+  db.prepare("UPDATE temples SET logo_url = ? WHERE id = ?").run(base64, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "TEMPLE", entityId: req.temple.id, action: "UPDATE", userId: req.user.id, before: { logo_url: req.temple.logo_url }, after: { logo_url: "(base64 image)" }, comments: "Logo uploaded" });
+  ok(res, { logoUrl: base64 });
 });
 
 app.get("/api/:templeSlug/admin/temples", requireAuth, requireRole("SUPER_TRUSTEE"), (req, res) => {
@@ -1081,10 +1081,7 @@ app.post("/api/:templeSlug/events", requireAuth, requireRole("TRUSTEE", "SUPER_T
   if (!name || !eventDate) { res.status(400).json({ message: "Event name and date are required" }); return; }
   let imageUrl = null;
   if (req.file) {
-    const ext = req.file.originalname.split(".").pop() || "jpg";
-    const fileName = `event-${req.temple.id}-${Date.now()}.${ext}`;
-    renameSync(req.file.path, join(eventDir, fileName));
-    imageUrl = `/uploads/events/${fileName}`;
+    imageUrl = fileToDataUrl(req.file);
   }
   const result = db.prepare(`
     INSERT INTO events (temple_id, name, event_date, end_date, description, budget, status, recurrence, image_url, created_by_user_id)
@@ -1109,10 +1106,7 @@ app.put("/api/:templeSlug/events/:id", requireAuth, requireRole("TRUSTEE", "SUPE
   if (!before) { res.status(404).json({ message: "Event not found" }); return; }
   let imageUrl = before.image_url;
   if (req.file) {
-    const ext = req.file.originalname.split(".").pop() || "jpg";
-    const fileName = `event-${req.temple.id}-${Date.now()}.${ext}`;
-    renameSync(req.file.path, join(eventDir, fileName));
-    imageUrl = `/uploads/events/${fileName}`;
+    imageUrl = fileToDataUrl(req.file);
   }
   db.prepare(`
     UPDATE events SET name = ?, event_date = ?, end_date = ?, description = ?, budget = ?, actual_cost = ?, status = ?, recurrence = ?, image_url = ?, updated_at = CURRENT_TIMESTAMP

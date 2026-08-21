@@ -545,10 +545,11 @@ export function fetchEventSummary(id: number) {
 
 // ─── Upload Functions ──────────────────────────────────────────────────────────
 
-export function uploadTempleLogo(formData: FormData) {
+export function uploadTempleLogo(file: File) {
   return request<{ logoUrl: string }>("/admin/logo", {
     method: "POST",
-    body: formData
+    headers: { "Content-Type": file.type || "image/png" },
+    body: file
   });
 }
 

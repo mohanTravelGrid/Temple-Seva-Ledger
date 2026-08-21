@@ -1437,9 +1437,7 @@ function SettingsTab({ onSettingsChange }: { onSettingsChange: (settings: Partia
     if (!file) return;
     setMessage("");
     try {
-      const formData = new FormData();
-      formData.append("logo", file);
-      const result = await uploadTempleLogo(formData);
+      const result = await uploadTempleLogo(file);
       setForm((f) => ({ ...f, logoUrl: result.logoUrl }));
       setLogoPreview(result.logoUrl);
       onSettingsChange({ logoUrl: result.logoUrl });
