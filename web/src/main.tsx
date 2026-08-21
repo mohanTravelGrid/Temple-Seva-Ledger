@@ -910,6 +910,7 @@ function EventsView({ session }: { session: Session }) {
   const [summary, setSummary] = useState<{ totalTasks: number; doneTasks: number; totalPoojas: number; poojaRevenue: number; totalExpenses: number; balance: number } | null>(null);
   const [eventMonth, setEventMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [detailTab, setDetailTab] = useState<"summary" | "tasks" | "poojas" | "expenses">("summary");
   const [message, setMessage] = useState("");
   const [form, setForm] = useState({ name: "", eventDate: "", endDate: "", description: "", budget: "", status: "PLANNED", recurrence: "NONE" });
@@ -933,7 +934,23 @@ function EventsView({ session }: { session: Session }) {
   };
 
   function openAdd() {
+    setEditingId(null);
     setForm({ name: "", eventDate: "", endDate: "", description: "", budget: "", status: "PLANNED", recurrence: "NONE" });
+    setIsFormOpen(true);
+  }
+
+  function openEdit(ev: EventRow) {
+    setEditingId(ev.id);
+    setForm({
+      name: ev.name,
+      eventDate: ev.event_date,
+      endDate: ev.end_date ?? "",
+      description: ev.description ?? "",
+      budget: String(ev.budget || ""),
+      status: ev.status,
+      recurrence: ev.recurrence,
+    });
+    setEventImage(null);
     setIsFormOpen(true);
   }
 
@@ -950,10 +967,16 @@ function EventsView({ session }: { session: Session }) {
       formData.append("status", form.status);
       formData.append("recurrence", form.recurrence);
       if (eventImage) formData.append("eventImage", eventImage);
-      await createEventWithImage(formData);
+      if (editingId) {
+        await updateEventWithImage(editingId, formData);
+      } else {
+        await createEventWithImage(formData);
+      }
       setIsFormOpen(false);
+      setEditingId(null);
       setEventImage(null);
       loadEvents();
+      if (selectedId) loadDetail(selectedId);
     } catch (err) { setMessage(err instanceof Error ? err.message : "Unable to save"); }
   }
 
@@ -1019,6 +1042,7 @@ function EventsView({ session }: { session: Session }) {
           <div className="button-row" style={{ marginTop: 0 }}>
             <button className="mini-button" type="button" onClick={() => setShowPoster("en")}>{l.viewPoster || "Poster"} (EN)</button>
             <button className="mini-button" type="button" onClick={() => setShowPoster("kn")}>{l.viewPoster || "Poster"} (ಕನ್ನಡ)</button>
+            {isTrustee ? <button className="mini-button" type="button" onClick={() => openEdit(detail.event)}>{l.edit || "Edit"}</button> : null}
             {isTrustee ? <button className="mini-button danger" type="button" onClick={() => removeEvent(detail.event.id)}>{l.remove}</button> : null}
             <button className="text-button" type="button" onClick={() => { setSelectedId(null); setDetail(null); }}>← Back</button>
           </div>
@@ -1144,9 +1168,9 @@ function EventsView({ session }: { session: Session }) {
             <div className="poster-frame">
               <div className="poster-border">
                 <div className="poster-content">
-                  {detail.event.image_url ? <img src={detail.event.image_url} alt="" className="poster-event-image" /> : null}
                   {session.temple?.logoUrl ? <img src={session.temple.logoUrl} alt="Logo" className="poster-logo" /> : null}
                   <h1 className="poster-temple-name">{session.temple?.name || ""}</h1>
+                  {detail.event.image_url ? <img src={detail.event.image_url} alt="" className="poster-event-image" /> : null}
                   <div className="poster-om">ॐ</div>
                   <h2 className="poster-event-name">{detail.event.name}</h2>
                   <div className="poster-details">
@@ -1184,8 +1208,8 @@ function EventsView({ session }: { session: Session }) {
       </div>
       {message ? <p className="notice">{message}</p> : null}
       {events.map((ev) => (
-        <article key={ev.id} className="event-card" onClick={() => loadDetail(ev.id)} style={{ cursor: "pointer" }}>
-          <div className="event-header">
+        <article key={ev.id} className="event-card" style={{ cursor: "pointer" }}>
+          <div className="event-header" onClick={() => loadDetail(ev.id)}>
             <div>
               <strong>{ev.name}</strong>
               <p>{ev.event_date}{ev.end_date ? ` — ${ev.end_date}` : ""} · {ev.createdByName}</p>
@@ -1193,6 +1217,7 @@ function EventsView({ session }: { session: Session }) {
             </div>
             <span className={`status-badge ${ev.status.toLowerCase()}`}>{ev.status}</span>
           </div>
+          {isTrustee ? <div className="event-card-actions"><button className="mini-button" type="button" onClick={(e) => { e.stopPropagation(); openEdit(ev); }}>{l.edit || "Edit"}</button></div> : null}
           {ev.totalTasks ? (
             <div className="progress-bar"><div className="fill" style={{ width: `${Math.round((ev.doneTasks ?? 0) / ev.totalTasks * 100)}%` }} /></div>
           ) : null}
@@ -1205,7 +1230,7 @@ function EventsView({ session }: { session: Session }) {
             <div className="section-title">
               <div>
                 <p className="eyebrow">{l.events}</p>
-                <h2>{l.addEvent}</h2>
+                <h2>{editingId ? (l.editEvent || "Edit Event") : l.addEvent}</h2>
               </div>
               <button className="text-button" type="button" onClick={() => setIsFormOpen(false)}>{l.close}</button>
             </div>
@@ -1222,7 +1247,7 @@ function EventsView({ session }: { session: Session }) {
               </div>
               <label>{l.eventImage || "Event Image"}<input type="file" accept="image/*" onChange={(e) => setEventImage(e.target.files?.[0] ?? null)} /></label>
               {eventImage ? <p className="subtle">{eventImage.name}</p> : null}
-              <button className="primary-button">{l.addEvent}</button>
+              <button className="primary-button">{editingId ? (l.saveChanges || "Save Changes") : l.addEvent}</button>
             </form>
           </div>
         </div>

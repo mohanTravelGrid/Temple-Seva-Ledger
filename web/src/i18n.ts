@@ -187,6 +187,7 @@ const labels = {
   print: "Print",
   allAreWelcome: "All Devotees are Cordially Invited",
   fromTrustees: "With Divine Blessings — From the Trustees",
+  editEvent: "Edit Event",
 } as const;
 
 const labelsKn: Record<keyof typeof labels, string> = {
@@ -376,6 +377,7 @@ const labelsKn: Record<keyof typeof labels, string> = {
   print: "ಮುದ್ರಿಸಿ",
   allAreWelcome: "ಎಲ್ಲಾ ಭಕ್ತರನ್ನು ಆದರದಿಂದ ಆಹ್ವಾನಿಸಲಾಗಿದೆ",
   fromTrustees: "ದೈವ ಕೃಪೆಯಿಂದ — ಟ್ರಸ್ಟಿಗಳಿಂದ",
+  editEvent: "ಕಾರ್ಯಕ್ರಮ ತಿದ್ದುಪಡಿ",
 };
 
 export const allLabels: Record<LangCode, Record<keyof typeof labels, string>> = {
