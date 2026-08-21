@@ -4,7 +4,7 @@ export type TransactionType = "INCOME" | "EXPENSE";
 export type Session = {
   token: string;
   user: { id: number; name: string; email: string; role: Role };
-  temple: { id: number; slug: string; name: string; approvalThreshold: number; defaultLanguage: string };
+  temple: { id: number; slug: string; name: string; logoUrl: string | null; approvalThreshold: number; defaultLanguage: string };
 };
 
 export type Category = {
@@ -416,6 +416,7 @@ export type EventRow = {
   actual_cost: number;
   status: string;
   recurrence: string;
+  image_url: string | null;
   created_by_user_id: number;
   active: number;
   created_at: string;
@@ -540,4 +541,31 @@ export function createEventExpense(eventId: number, payload: Record<string, stri
 
 export function fetchEventSummary(id: number) {
   return request<EventSummary>(`/events/${id}/summary`);
+}
+
+// ─── Upload Functions ──────────────────────────────────────────────────────────
+
+export function uploadTempleLogo(formData: FormData) {
+  return request<{ logoUrl: string }>("/admin/logo", {
+    method: "POST",
+    body: formData
+  });
+}
+
+export function fetchTempleLogo() {
+  return request<{ logoUrl: string | null }>("/admin/logo");
+}
+
+export function createEventWithImage(formData: FormData) {
+  return request<EventRow>("/events", {
+    method: "POST",
+    body: formData
+  });
+}
+
+export function updateEventWithImage(id: number, formData: FormData) {
+  return request<EventRow>(`/events/${id}`, {
+    method: "PUT",
+    body: formData
+  });
 }

@@ -63,7 +63,10 @@ import {
   updateEventTask,
   createEventPooja,
   createEventExpense,
-  fetchEventSummary
+  fetchEventSummary,
+  uploadTempleLogo,
+  createEventWithImage,
+  updateEventWithImage
 } from "./api/client";
 import { allLabels, LangCode } from "./i18n";
 import "./styles/app.css";
@@ -910,10 +913,12 @@ function EventsView({ session }: { session: Session }) {
   const [detailTab, setDetailTab] = useState<"summary" | "tasks" | "poojas" | "expenses">("summary");
   const [message, setMessage] = useState("");
   const [form, setForm] = useState({ name: "", eventDate: "", endDate: "", description: "", budget: "", status: "PLANNED", recurrence: "NONE" });
+  const [eventImage, setEventImage] = useState<File | null>(null);
   const [taskForm, setTaskForm] = useState({ title: "", assignedTo: "", dueDate: "", notes: "" });
   const [poojaForm, setPoojaForm] = useState({ poojaType: "", scheduledDate: "", amount: "", devoteeName: "", createBooking: true });
   const [expenseForm, setExpenseForm] = useState({ description: "", amount: "", transactionDate: new Date().toISOString().slice(0, 10), paymentMode: "CASH" });
   const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
+  const [showPoster, setShowPoster] = useState<"en" | "kn" | null>(null);
   const isTrustee = session.user.role === "TRUSTEE" || session.user.role === "SUPER_TRUSTEE";
 
   const loadEvents = () => fetchEvents(eventMonth).then(setEvents).catch(console.error);
@@ -936,8 +941,18 @@ function EventsView({ session }: { session: Session }) {
     event.preventDefault();
     setMessage("");
     try {
-      await createEvent({ ...form, budget: Number(form.budget || 0) });
+      const formData = new FormData();
+      formData.append("name", form.name);
+      formData.append("eventDate", form.eventDate);
+      formData.append("endDate", form.endDate);
+      formData.append("description", form.description);
+      formData.append("budget", String(Number(form.budget || 0)));
+      formData.append("status", form.status);
+      formData.append("recurrence", form.recurrence);
+      if (eventImage) formData.append("eventImage", eventImage);
+      await createEventWithImage(formData);
       setIsFormOpen(false);
+      setEventImage(null);
       loadEvents();
     } catch (err) { setMessage(err instanceof Error ? err.message : "Unable to save"); }
   }
@@ -1002,6 +1017,8 @@ function EventsView({ session }: { session: Session }) {
             <h2>{detail.event.name}</h2>
           </div>
           <div className="button-row" style={{ marginTop: 0 }}>
+            <button className="mini-button" type="button" onClick={() => setShowPoster("en")}>{l.viewPoster || "Poster"} (EN)</button>
+            <button className="mini-button" type="button" onClick={() => setShowPoster("kn")}>{l.viewPoster || "Poster"} (ಕನ್ನಡ)</button>
             {isTrustee ? <button className="mini-button danger" type="button" onClick={() => removeEvent(detail.event.id)}>{l.remove}</button> : null}
             <button className="text-button" type="button" onClick={() => { setSelectedId(null); setDetail(null); }}>← Back</button>
           </div>
@@ -1108,8 +1125,48 @@ function EventsView({ session }: { session: Session }) {
             ))}
             {detail.expenses.length === 0 ? <p className="subtle">No expenses yet.</p> : null}
           </>
-        ) : null}
-      </section>
+      ) : null}
+      {showPoster && detail ? (() => {
+        const pl = allLabels[showPoster];
+        return (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setShowPoster(null)}>
+          <div className="modal-panel poster-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="section-title">
+              <div>
+                <p className="eyebrow">{pl.events}</p>
+                <h2>{pl.eventPoster}</h2>
+              </div>
+              <div className="button-row" style={{ marginTop: 0 }}>
+                <button className="mini-button" type="button" onClick={() => { window.print(); }}>{pl.print}</button>
+                <button className="text-button" type="button" onClick={() => setShowPoster(null)}>{pl.close}</button>
+              </div>
+            </div>
+            <div className="poster-frame">
+              <div className="poster-border">
+                <div className="poster-content">
+                  {detail.event.image_url ? <img src={detail.event.image_url} alt="" className="poster-event-image" /> : null}
+                  {session.temple?.logoUrl ? <img src={session.temple.logoUrl} alt="Logo" className="poster-logo" /> : null}
+                  <h1 className="poster-temple-name">{session.temple?.name || ""}</h1>
+                  <div className="poster-om">ॐ</div>
+                  <h2 className="poster-event-name">{detail.event.name}</h2>
+                  <div className="poster-details">
+                    <p className="poster-date">{detail.event.event_date}{detail.event.end_date ? ` — ${detail.event.end_date}` : ""}</p>
+                    {detail.event.description ? <p className="poster-desc">{detail.event.description}</p> : null}
+                  </div>
+                  <div className="poster-welcome">
+                    {pl.allAreWelcome}
+                  </div>
+                  <div className="poster-from">
+                    {pl.fromTrustees}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        );
+      })() : null}
+    </section>
     );
   }
 
@@ -1163,6 +1220,8 @@ function EventsView({ session }: { session: Session }) {
                 <label>{l.budget}<input inputMode="decimal" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} /></label>
                 <label>{l.recurrence}<select value={form.recurrence} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}><option value="NONE">{l.none}</option><option value="YEARLY">{l.yearly}</option></select></label>
               </div>
+              <label>{l.eventImage || "Event Image"}<input type="file" accept="image/*" onChange={(e) => setEventImage(e.target.files?.[0] ?? null)} /></label>
+              {eventImage ? <p className="subtle">{eventImage.name}</p> : null}
               <button className="primary-button">{l.addEvent}</button>
             </form>
           </div>
@@ -1331,19 +1390,40 @@ function SettingsTab({ onSettingsChange }: { onSettingsChange: (settings: Partia
   const l = useLabels();
   const [form, setForm] = useState({ name: "", address: "", logoUrl: "", approvalThreshold: "", defaultLanguage: "en", currency: "INR" });
   const [message, setMessage] = useState("");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTemplePublic()
-      .then((temple) => setForm({
-        name: temple.name,
-        address: temple.address ?? "",
-        logoUrl: temple.logoUrl ?? "",
-        approvalThreshold: String(temple.approvalThreshold),
-        defaultLanguage: temple.defaultLanguage || "en",
-        currency: temple.currency || "INR",
-      }))
+      .then((temple) => {
+        setForm({
+          name: temple.name,
+          address: temple.address ?? "",
+          logoUrl: temple.logoUrl ?? "",
+          approvalThreshold: String(temple.approvalThreshold),
+          defaultLanguage: temple.defaultLanguage || "en",
+          currency: temple.currency || "INR",
+        });
+        if (temple.logoUrl) setLogoPreview(temple.logoUrl);
+      })
       .catch((err) => setMessage(err instanceof Error ? err.message : "Unable to load temple settings"));
   }, []);
+
+  async function handleLogoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setMessage("");
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const result = await uploadTempleLogo(formData);
+      setForm((f) => ({ ...f, logoUrl: result.logoUrl }));
+      setLogoPreview(result.logoUrl);
+      onSettingsChange({ logoUrl: result.logoUrl });
+      setMessage("Logo uploaded.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Unable to upload logo");
+    }
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -1368,7 +1448,10 @@ function SettingsTab({ onSettingsChange }: { onSettingsChange: (settings: Partia
     <form className="panel form-stack" onSubmit={submit}>
       <label>{l.templeName}<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
       <label>{l.address}<input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>
-      <label>{l.logoUrl}<input value={form.logoUrl} onChange={(event) => setForm({ ...form, logoUrl: event.target.value })} /></label>
+      <div className="logo-upload-area">
+        {logoPreview ? <img src={logoPreview} alt="Temple Logo" className="logo-preview" /> : null}
+        <label className="logo-upload-btn">{l.templeLogo || "Temple Logo"}<input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: "none" }} /></label>
+      </div>
       <div className="two-col">
         <label>{l.approvalThreshold}<input inputMode="decimal" value={form.approvalThreshold} onChange={(event) => setForm({ ...form, approvalThreshold: event.target.value })} /></label>
         <label>{l.defaultLanguage}<select value={form.defaultLanguage} onChange={(event) => setForm({ ...form, defaultLanguage: event.target.value })}><option value="en">{l.english}</option><option value="kn">{l.kannada}</option></select></label>

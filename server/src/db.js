@@ -242,6 +242,7 @@ export function initDb() {
   addColumnIfMissing("pooja_bookings", "income_transaction_id", "INTEGER REFERENCES transactions(id)");
   addColumnIfMissing("users", "updated_at", "TEXT");
   addColumnIfMissing("temples", "currency", "TEXT NOT NULL DEFAULT 'INR'");
+  addColumnIfMissing("events", "image_url", "TEXT");
 
   const existing = db.prepare("SELECT id FROM temples WHERE slug = ?").get("hanumagiri");
   if (existing) return;

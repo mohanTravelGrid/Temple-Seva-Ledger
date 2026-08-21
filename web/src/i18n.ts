@@ -180,6 +180,13 @@ const labels = {
   items: "items",
   belowMinStock: "below minimum stock",
   description: "Description",
+  templeLogo: "Temple Logo",
+  eventImage: "Event Image",
+  viewPoster: "Poster",
+  eventPoster: "Event Poster",
+  print: "Print",
+  allAreWelcome: "All Devotees are Cordially Invited",
+  fromTrustees: "With Divine Blessings — From the Trustees",
 } as const;
 
 const labelsKn: Record<keyof typeof labels, string> = {
@@ -362,6 +369,13 @@ const labelsKn: Record<keyof typeof labels, string> = {
   items: "ಐಟಂಗಳು",
   belowMinStock: "ಕನಿಷ್ಠ ಸ್ಟಾಕ್ ಕಡಿಮೆ",
   description: "ವಿವರಣೆ",
+  templeLogo: "ದೇವಾಲಯ ಲಾಂಛನ",
+  eventImage: "ಕಾರ್ಯಕ್ರಮ ಚಿತ್ರ",
+  viewPoster: "ಪೋಸ್ಟರ್",
+  eventPoster: "ಕಾರ್ಯಕ್ರಮ ಪೋಸ್ಟರ್",
+  print: "ಮುದ್ರಿಸಿ",
+  allAreWelcome: "ಎಲ್ಲಾ ಭಕ್ತರನ್ನು ಆದರದಿಂದ ಆಹ್ವಾನಿಸಲಾಗಿದೆ",
+  fromTrustees: "ದೈವ ಕೃಪೆಯಿಂದ — ಟ್ರಸ್ಟಿಗಳಿಂದ",
 };
 
 export const allLabels: Record<LangCode, Record<keyof typeof labels, string>> = {

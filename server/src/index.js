@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import multer from "multer";
-import { mkdirSync, existsSync } from "node:fs";
+import { mkdirSync, existsSync, renameSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { createSession, requireAuth, requireRole } from "./auth.js";
@@ -12,8 +12,14 @@ initDb();
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
 const uploadDir = join(process.cwd(), "uploads", "receipts");
+const logoDir = join(process.cwd(), "uploads", "logos");
+const eventDir = join(process.cwd(), "uploads", "events");
 mkdirSync(uploadDir, { recursive: true });
+mkdirSync(logoDir, { recursive: true });
+mkdirSync(eventDir, { recursive: true });
 const upload = multer({ dest: uploadDir, limits: { fileSize: 8 * 1024 * 1024 } });
+const uploadLogo = multer({ dest: logoDir, limits: { fileSize: 5 * 1024 * 1024 } });
+const uploadEvent = multer({ dest: eventDir, limits: { fileSize: 5 * 1024 * 1024 } });
 
 app.use(cors());
 app.use(express.json());
@@ -155,6 +161,17 @@ app.get("/api/:templeSlug/public/temples", (req, res) => {
   ok(res, temples);
 });
 
+app.get("/api/:templeSlug/public/events/:eventId/poster", (req, res) => {
+  const temple = getTempleBySlug(req.params.templeSlug);
+  if (!temple) { res.status(404).json({ message: "Temple not found" }); return; }
+  const event = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ? AND active = 1").get(req.params.eventId, temple.id);
+  if (!event) { res.status(404).json({ message: "Event not found" }); return; }
+  ok(res, {
+    temple: { name: temple.name, address: temple.address, logoUrl: temple.logo_url },
+    event: { name: event.name, eventDate: event.event_date, endDate: event.end_date, description: event.description, imageUrl: event.image_url, status: event.status },
+  });
+});
+
 app.post("/api/:templeSlug/auth/login", (req, res) => {
   const temple = getTempleBySlug(req.params.templeSlug);
   if (!temple) {
@@ -170,12 +187,12 @@ app.post("/api/:templeSlug/auth/login", (req, res) => {
   ok(res, {
     token: createSession(user),
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    temple: { id: temple.id, slug: temple.slug, name: temple.name, approvalThreshold: temple.approval_threshold, defaultLanguage: temple.default_language },
+    temple: { id: temple.id, slug: temple.slug, name: temple.name, logoUrl: temple.logo_url, approvalThreshold: temple.approval_threshold, defaultLanguage: temple.default_language },
   });
 });
 
 app.get("/api/:templeSlug/me", requireAuth, (req, res) => {
-  ok(res, { user: req.user, temple: req.temple });
+  ok(res, { user: req.user, temple: { id: req.temple.id, slug: req.temple.slug, name: req.temple.name, logoUrl: req.temple.logo_url, approvalThreshold: req.temple.approval_threshold, defaultLanguage: req.temple.default_language } });
 });
 
 app.get("/api/:templeSlug/dashboard", requireAuth, (req, res) => {
@@ -469,6 +486,22 @@ app.put("/api/:templeSlug/temple", requireAuth, requireRole("TRUSTEE", "SUPER_TR
     defaultLanguage: after.default_language,
     currency: after.currency || "INR",
   });
+});
+
+app.get("/api/:templeSlug/admin/logo", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+  const temple = db.prepare("SELECT logo_url FROM temples WHERE id = ?").get(req.temple.id);
+  ok(res, { logoUrl: temple?.logo_url || null });
+});
+
+app.post("/api/:templeSlug/admin/logo", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), uploadLogo.single("logo"), (req, res) => {
+  if (!req.file) { res.status(400).json({ message: "No file uploaded" }); return; }
+  const ext = req.file.originalname.split(".").pop() || "png";
+  const fileName = `logo-${req.temple.id}-${Date.now()}.${ext}`;
+  renameSync(req.file.path, join(logoDir, fileName));
+  const logoUrl = `/uploads/logos/${fileName}`;
+  db.prepare("UPDATE temples SET logo_url = ? WHERE id = ?").run(logoUrl, req.temple.id);
+  writeAudit({ templeId: req.temple.id, entityType: "TEMPLE", entityId: req.temple.id, action: "UPDATE", userId: req.user.id, before: { logo_url: req.temple.logo_url }, after: { logo_url: logoUrl }, comments: "Logo uploaded" });
+  ok(res, { logoUrl });
 });
 
 app.get("/api/:templeSlug/admin/temples", requireAuth, requireRole("SUPER_TRUSTEE"), (req, res) => {
@@ -1042,13 +1075,20 @@ app.get("/api/:templeSlug/events", requireAuth, (req, res) => {
   ok(res, rows);
 });
 
-app.post("/api/:templeSlug/events", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+app.post("/api/:templeSlug/events", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), uploadEvent.single("eventImage"), (req, res) => {
   const name = String(req.body.name ?? "").trim();
   const eventDate = String(req.body.eventDate ?? "").trim();
   if (!name || !eventDate) { res.status(400).json({ message: "Event name and date are required" }); return; }
+  let imageUrl = null;
+  if (req.file) {
+    const ext = req.file.originalname.split(".").pop() || "jpg";
+    const fileName = `event-${req.temple.id}-${Date.now()}.${ext}`;
+    renameSync(req.file.path, join(eventDir, fileName));
+    imageUrl = `/uploads/events/${fileName}`;
+  }
   const result = db.prepare(`
-    INSERT INTO events (temple_id, name, event_date, end_date, description, budget, status, recurrence, created_by_user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO events (temple_id, name, event_date, end_date, description, budget, status, recurrence, image_url, created_by_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     req.temple.id, name, eventDate,
     req.body.endDate || null,
@@ -1056,6 +1096,7 @@ app.post("/api/:templeSlug/events", requireAuth, requireRole("TRUSTEE", "SUPER_T
     Number(req.body.budget ?? 0),
     req.body.status || "PLANNED",
     req.body.recurrence || "NONE",
+    imageUrl,
     req.user.id
   );
   const event = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ?").get(result.lastInsertRowid, req.temple.id);
@@ -1063,11 +1104,18 @@ app.post("/api/:templeSlug/events", requireAuth, requireRole("TRUSTEE", "SUPER_T
   ok(res, event);
 });
 
-app.put("/api/:templeSlug/events/:id", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), (req, res) => {
+app.put("/api/:templeSlug/events/:id", requireAuth, requireRole("TRUSTEE", "SUPER_TRUSTEE"), uploadEvent.single("eventImage"), (req, res) => {
   const before = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ? AND active = 1").get(req.params.id, req.temple.id);
   if (!before) { res.status(404).json({ message: "Event not found" }); return; }
+  let imageUrl = before.image_url;
+  if (req.file) {
+    const ext = req.file.originalname.split(".").pop() || "jpg";
+    const fileName = `event-${req.temple.id}-${Date.now()}.${ext}`;
+    renameSync(req.file.path, join(eventDir, fileName));
+    imageUrl = `/uploads/events/${fileName}`;
+  }
   db.prepare(`
-    UPDATE events SET name = ?, event_date = ?, end_date = ?, description = ?, budget = ?, actual_cost = ?, status = ?, recurrence = ?, updated_at = CURRENT_TIMESTAMP
+    UPDATE events SET name = ?, event_date = ?, end_date = ?, description = ?, budget = ?, actual_cost = ?, status = ?, recurrence = ?, image_url = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND temple_id = ?
   `).run(
     req.body.name || before.name,
@@ -1078,6 +1126,7 @@ app.put("/api/:templeSlug/events/:id", requireAuth, requireRole("TRUSTEE", "SUPE
     req.body.actualCost === undefined ? before.actual_cost : Number(req.body.actualCost),
     req.body.status || before.status,
     req.body.recurrence || before.recurrence,
+    imageUrl,
     before.id, req.temple.id
   );
   const after = db.prepare("SELECT * FROM events WHERE id = ? AND temple_id = ?").get(before.id, req.temple.id);
